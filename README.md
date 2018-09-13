@@ -1,4 +1,3 @@
-# anlpir-project-2018
-Project of the ANLPIR course - 2018
+ANLPIR project by Luca Di Liello and Martina Paganin
 
-Please launch simply with ./main.py
+Please launch with ./main.py

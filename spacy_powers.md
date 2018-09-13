@@ -1,0 +1,13 @@
+- Extract sentences
+- Extract lemma (general form)
+- Get neighbourhood words
+- Get tag
+- Get POS tag
+- Get chunks of a sentence
+- Extract real world entities
+- Build dependency trees
+- Extract subjects
+- Words normalization (I'm gonna to walk -> I am going to walk)
+- Entities similarity
+- Sentence content similarity
+- Get word vector and check if vector exists
