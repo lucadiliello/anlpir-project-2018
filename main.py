@@ -270,6 +270,8 @@ sprint("Training NN",1)
 optimizer = optim.SGD(net.parameters(), lr=initial_learning_rate)
 net.train()
 
+print([x.size() for x in list(net.parameters())])
+
 from time import time
 starting_time = time()
 sprint('Batch size: %d' % batch_size, 2)
@@ -308,13 +310,13 @@ for epoch in range(training_epochs):
 
     valid_outputs_pos = net(valid_q_pos, valid_pos) > thres
     valid_outputs_neg = net(valid_q_neg, valid_neg) > thres
-    print(valid_outputs_pos)
-    print(valid_outputs_neg)
+    #print(valid_outputs_pos)
+    #print(valid_outputs_neg)
     true_pos = torch.nonzero(valid_outputs_pos).size(0)
     false_neg = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_pos).size(0)
     true_neg = torch.nonzero(valid_outputs_neg).size(0)
     false_pos = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_neg).size(0)
-    print(true_pos, true_neg, false_pos, false_neg)
+    #print(true_pos, true_neg, false_pos, false_neg)
 
     sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % ((true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos), true_pos/ (true_pos+false_pos), true_pos/ (true_pos+false_neg) ), 4)
 

@@ -83,7 +83,7 @@ class AttentivePoolingNetwork(nn.Module):
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
-        self.U = torch.randn((self.convolutional_filters, self.convolutional_filters), requires_grad=True).to(self.device)
+        self.U = torch.randn(self.convolutional_filters, self.convolutional_filters).to(self.device)
 
         self.tanh = nn.Tanh()
         self.max_pool = nn.MaxPool1d(self.max_len)
