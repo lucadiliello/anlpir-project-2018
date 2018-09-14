@@ -9,6 +9,7 @@ class BatchCreator(object):
         self.data = self.elaborate_data(data)
         self.batch_size = batch_size
         self.device = device
+        self.last_index = 0
         shuffle(data)
 
     def next(self):
@@ -56,3 +57,30 @@ class BatchCreator(object):
                 neg_array.append(ans)
 
         return torch.tensor(pos_ques, requires_grad=False).to(self.device), torch.tensor(neg_ques, requires_grad=False).to(self.device), torch.tensor(pos_array, requires_grad=False).to(self.device), torch.tensor(neg_array, requires_grad=False).to(self.device)
+
+
+    def reset_index(self):
+        self.last_index = 0
+
+
+    def ordered_next(self):
+        if self.last_index > len(self.data):
+            return None
+
+        tmp = self.data[self.last_index : self.last_index + self.batch_size]
+        self.last_index += self.batch_size
+        questions = []
+        pos_array = []
+        neg_array = []
+
+        for entry in tmp:
+            index = random.randint(0, len(entry['candidates_pos']) - 1)
+            pos = entry['candidates_pos'][index]
+            index = random.randint(0, len(entry['candidates_neg']) - 1)
+            neg = entry['candidates_neg'][index]
+
+            questions.append(entry['question'])
+            pos_array.append(pos)
+            neg_array.append(neg)
+
+        return torch.tensor(questions, requires_grad=False).to(self.device), torch.tensor(pos_array, requires_grad=False).to(self.device), torch.tensor(neg_array, requires_grad=False).to(self.device)

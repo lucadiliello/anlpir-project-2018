@@ -152,12 +152,12 @@ sprint('Initializing Hyperparameters', 1)
 k = 3 # 3, 5, 7
 word_embedding_size = 300
 convolutional_filters = 400
-batch_size = 20
-initial_learning_rate = 0.05
-loss_margin = 1
-training_epochs = 50
+batch_size = 50
+initial_learning_rate = 1.1
+loss_margin = 0.5
+training_epochs = 25
 n_threads = 8
-word_embedding_window = 5
+word_embedding_window = 3
 
 def get_device():
     if torch.cuda.is_available():
@@ -299,7 +299,7 @@ for epoch in range(training_epochs):
     #loss = ((outputs_pos - 1.)**2 + (outputs_neg)**2).sum()
     #loss = sum((outputs_pos - 1)**2 + (outputs_neg)**2)
 
-    sprint("Epoch %d, loss: %2.2f" % (epoch+1, loss.item()), 3)
+    sprint("Epoch %d, loss: %2.3f" % (epoch+1, loss.item()), 3)
     loss.backward()
     optimizer.step()    # Does the update
 
@@ -319,5 +319,44 @@ for epoch in range(training_epochs):
 
     sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % ((true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos), true_pos/ (true_pos+false_pos), true_pos/ (true_pos+false_neg) ), 4)
 
-
 sprint('Training took %.2f seconds' % (time()-starting_time), 2)
+
+################################################################################
+### TESTING THE NETWORK
+################################################################################
+
+sprint("Testing NN", 1)
+
+starting_time = time()
+accu_array = []
+recall_array = []
+prec_array = []
+
+round = 1
+sprint('Starting', 2)
+while True:
+    input = test_ds.ordered_next()
+    if input is None:
+        break
+    questions, inputs_pos, inputs_neg = input
+
+    valid_outputs_pos = net(quest, valid_pos) > thres
+    valid_outputs_neg = net(quest, valid_neg) > thres
+
+    true_pos = torch.nonzero(valid_outputs_pos).size(0)
+    false_neg = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_pos).size(0)
+    true_neg = torch.nonzero(valid_outputs_neg).size(0)
+    false_pos = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_neg).size(0)
+
+    accu_array.append((true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos))
+    recall_array.append(true_pos/ (true_pos+false_neg))
+    prec_array.append(true_pos/ (true_pos+false_pos))
+
+    sprint('Round %d done! (%d elements tested)' % (round, len(questions)), 3)
+    round += 1
+
+
+import numpy
+sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % (numpy.mean(accu_array), numpy.mean(prec_array), numpy.mean(recall_array)), 2)
+
+sprint('Testing took %.2f seconds' % (time()-starting_time), 2)
