@@ -153,8 +153,8 @@ k = 3 # 3, 5, 7
 word_embedding_size = 300
 convolutional_filters = 400
 batch_size = 20
-initial_learning_rate = 1.1
-loss_margin = .5
+initial_learning_rate = 0.05
+loss_margin = 1
 training_epochs = 50
 n_threads = 8
 word_embedding_window = 5
@@ -201,25 +201,26 @@ def get_M_L(ds):
             L = max(L, len(cand['sentence']))
     return (M, L)
 
-sentence_len = max(*get_M_L(train), *get_M_L(valid), *get_M_L(test))
+tup = (get_M_L(train), get_M_L(valid), get_M_L(test))
+M_len, L_len = (max([x[0] for x in tup]), max([x[1] for x in tup]))
 
-sprint("Max sentence length: %d" % sentence_len, 2)
+sprint("Max question length: %d, max answer length: %d" % (M_len, L_len), 2)
 
 
 ################################################################################
 ### DATASETS PADDING
 ################################################################################
 
-sprint('Padding datasets to %d' % sentence_len, 1)
+sprint('Padding datasets to %d for questions and %d for answers' % (M_len, L_len), 1)
 
 def pad_dataset(ds):
     res = []
     for entry in ds:
         tmp = {}
-        tmp['question'] = entry['question'] + ([0] * (sentence_len - len(entry['question'])) if sentence_len - len(entry['question']) > 0 else [])
+        tmp['question'] = entry['question'] + ([0] * (M_len - len(entry['question'])) if M_len - len(entry['question']) > 0 else [])
         tmp['candidates'] = []
         for cand in entry['candidates']:
-            tmp['candidates'].append({'sentence': cand['sentence'] + ([0] * (sentence_len - len(cand['sentence'])) if sentence_len - len(cand['sentence']) > 0 else []), 'label': cand['label']})
+            tmp['candidates'].append({'sentence': cand['sentence'] + ([0] * (L_len - len(cand['sentence'])) if L_len - len(cand['sentence']) > 0 else []), 'label': cand['label']})
         res.append(tmp)
     return res
 
@@ -242,7 +243,7 @@ from support_data_structures import datasets
 
 train_ds = datasets.BatchCreator(train, batch_size, device)
 sprint("Done train",2)
-valid_ds = datasets.BatchCreator(valid, batch_size, device)
+valid_ds = datasets.BatchCreator(valid, 50, device)
 sprint("Done validation",2)
 test_ds = datasets.BatchCreator(test, batch_size, device)
 sprint("Done test",2)
@@ -256,7 +257,7 @@ sprint("Neural network creation",1)
 
 from support_data_structures import networks
 
-net = networks.AttentivePoolingNetwork(sentence_len, len(vocab), word_embedding_size, word2vec_embedding_matrix, device, type_of_nn='CNN', convolutional_filters=convolutional_filters, context_len=k).to(device)
+net = networks.AttentivePoolingNetwork((M_len, L_len), len(vocab), word_embedding_size, word2vec_embedding_matrix, device, type_of_nn='CNN', convolutional_filters=convolutional_filters, context_len=k).to(device)
 #print(net)
 sprint("NN Instantiated", 2)
 
@@ -270,14 +271,11 @@ sprint("Training NN",1)
 optimizer = optim.SGD(net.parameters(), lr=initial_learning_rate)
 net.train()
 
-print([x.size() for x in list(net.parameters())])
+#print([x.size() for x in list(net.parameters())])
 
 from time import time
 starting_time = time()
 sprint('Batch size: %d' % batch_size, 2)
-
-## valid datasets
-valid_q_pos, valid_q_neg, valid_pos, valid_neg = valid_ds.get_all_data()
 
 sprint("Starting",2)
 for epoch in range(training_epochs):
@@ -290,7 +288,7 @@ for epoch in range(training_epochs):
 
     sum = loss_margin + outputs_neg - outputs_pos
     ## to do the max between the results and 0 we place a tensor filled with zero side by side with the results tensor
-    res = torch.stack([sum, torch.zeros(batch_size).to(device)]).transpose(0,1).view(1,batch_size,2)
+    res = torch.stack([sum, torch.zeros(batch_size, requires_grad=False).to(device)]).transpose(0,1).view(1,batch_size,2)
 
     ## maxpooling on each tuple (res[i], 0)
     maxpoller = torch.nn.MaxPool1d(2)
@@ -306,10 +304,11 @@ for epoch in range(training_epochs):
     optimizer.step()    # Does the update
 
     ## Validation
-    thres = 0.5
+    thres = 0
+    quest, valid_pos, valid_neg = valid_ds.next()
 
-    valid_outputs_pos = net(valid_q_pos, valid_pos) > thres
-    valid_outputs_neg = net(valid_q_neg, valid_neg) > thres
+    valid_outputs_pos = net(quest, valid_pos) > thres
+    valid_outputs_neg = net(quest, valid_neg) > thres
     #print(valid_outputs_pos)
     #print(valid_outputs_neg)
     true_pos = torch.nonzero(valid_outputs_pos).size(0)

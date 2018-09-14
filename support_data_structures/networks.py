@@ -59,7 +59,7 @@ class AttentivePoolingNetwork(nn.Module):
 
         self.device = device
 
-        self.max_len = max_len
+        self.M, self.L = max_len
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
         ## params of the CNN
@@ -72,8 +72,8 @@ class AttentivePoolingNetwork(nn.Module):
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
-            self.question_cnn_bilstm = QA_CNN(self.max_len, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
-            self.answer_cnn_bilstm = QA_CNN(self.max_len, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
+            self.question_cnn_bilstm = QA_CNN(self.M, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
+            self.answer_cnn_bilstm = QA_CNN(self.L, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
         elif type_of_nn == 'biLSTM':
             raise NotImplementedError()
             '''
@@ -86,7 +86,8 @@ class AttentivePoolingNetwork(nn.Module):
         self.U = torch.randn(self.convolutional_filters, self.convolutional_filters).to(self.device)
 
         self.tanh = nn.Tanh()
-        self.max_pool = nn.MaxPool1d(self.max_len)
+        self.extract_q_feats = nn.MaxPool1d(self.L)
+        self.extract_a_feats = nn.MaxPool1d(self.M)
 
         self.softmax = nn.Softmax(dim=0)
 
@@ -107,20 +108,21 @@ class AttentivePoolingNetwork(nn.Module):
         A = self.answer_cnn_bilstm(answer)
         ## bs * c * L
 
+        ## transpose does not make a copy of the tensor, it only swaps the access indexes.
+        ## To make a complete new copy use .contiguous()
         Q = Q.transpose(1,2).contiguous()
         ## bs * M * c
 
-        ## bs * c * L
-        res = torch.mm(Q.view(batch_size * self.max_len, self.convolutional_filters), self.U).view(batch_size, self.max_len, self.convolutional_filters).bmm(A)
+        res = torch.mm(Q.view(batch_size * self.M, self.convolutional_filters), self.U).view(batch_size, self.M, self.convolutional_filters).bmm(A)
         ## bs * M * L
 
         G = self.tanh(res)
         ## bs * M * L
 
-        max_pool_Q = self.max_pool(G).view(-1, self.max_len, 1)
+        max_pool_Q = self.extract_q_feats(G).view(-1, self.M, 1)
         ## bs * M * 1
 
-        max_pool_A = self.max_pool(G.transpose(1,2)).view(-1, self.max_len, 1)
+        max_pool_A = self.extract_a_feats(G.transpose(1,2)).view(-1, self.L, 1)
         ## bs * L * 1
 
         Q = Q.transpose(1,2)
