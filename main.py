@@ -333,7 +333,7 @@ def train(questions, answers, labels):
     optimizer.zero_grad()   # zero the gradient buffers
     output = net(questions, answers)
     loss = torch.stack([torch.tensor(0.).to(device), loss_margin + output[1:].max() - output[0]], dim=0).max()
-    loss.backward()
+    loss.backward(retain_graph=True)
     optimizer.step()    # Does the update
     return loss.item()
 
