@@ -47,14 +47,36 @@ class QA_CNN(nn.Module):
     def pad_tensor(self):
         return torch.FloatTensor([.0] * self.embedding_size).to(self.device)
 
-
+ 
 class QA_biLSTM(nn.Module):
-    pass
 
+    def __init__(self, max_len, embedding_size, hidden_dim, device):
+        super(QA_biLSTM, self).__init__()
+
+        hidden_dim = int(hidden_dim/2)
+        self.device = device
+        self.max_len = max_len
+        self.hidden_dim = hidden_dim
+        self.embedding_size = embedding_size
+       
+        self.lstm = nn.LSTM(embedding_size, hidden_dim, bidirectional = True)
+
+        self.hidden = self.init_hidden()
+
+    def init_hidden(self):
+        return (torch.zeros(2, self.max_len, self.hidden_dim),
+                torch.zeros(2, self.max_len, self.hidden_dim))
+
+    def forward(self, x):
+        out, self.hidden = self.lstm(x, self.hidden)        
+        ## bs*M*c
+        out = out.transpose(1,2)
+        ## bs*c*M
+        return out      
 
 class AttentivePoolingNetwork(nn.Module):
 
-    def __init__(self, max_len, vocab_size, embedding_size, embedding_matrix, device, type_of_nn='CNN', convolutional_filters=300, context_len=3):
+    def __init__(self, max_len, vocab_size, embedding_size, embedding_matrix, device, type_of_nn='CNN', convolutional_filters=400, context_len=3):
         super(AttentivePoolingNetwork, self).__init__()
 
         self.device = device
@@ -74,12 +96,9 @@ class AttentivePoolingNetwork(nn.Module):
         if type_of_nn == 'CNN':
             self.question_cnn_bilstm = QA_CNN(self.M, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
             self.answer_cnn_bilstm = QA_CNN(self.L, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
-        elif type_of_nn == 'biLSTM':
-            raise NotImplementedError()
-            '''
-            self.question_cnn_bilstm = QA_biLSTM()
-            self.answer_cnn_bilstm = QA_biLSTM()
-            '''
+        elif type_of_nn == 'biLSTM':                       
+            self.question_cnn_bilstm = QA_biLSTM(self.M, self.embedding_size, self.convolutional_filters, self.device)
+            self.answer_cnn_bilstm = QA_biLSTM(self.L, self.embedding_size, self.convolutional_filters, self.device)
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
@@ -100,10 +119,12 @@ class AttentivePoolingNetwork(nn.Module):
 
         question = self.embed(question)
         ## bs * M * kd
+                
         Q = self.question_cnn_bilstm(question)
         ## bs * c * M
 
         answer = self.embed(answer)
+        #print(answer.size())
         ## bs * L * kd
         A = self.answer_cnn_bilstm(answer)
         ## bs * c * L

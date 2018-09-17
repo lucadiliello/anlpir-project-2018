@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 ## IMPORT DATA
+import sys
 import gensim
 import torch
 import torch.nn as nn
@@ -152,10 +153,10 @@ sprint('Initializing Hyperparameters', 1)
 k = 3 # 3, 5, 7
 word_embedding_size = 300
 convolutional_filters = 400
-batch_size = 50
+batch_size = 20
 initial_learning_rate = 1.1
 loss_margin = 0.5
-training_epochs = 25
+training_epochs = 20
 n_threads = 8
 word_embedding_window = 3
 
@@ -257,7 +258,7 @@ sprint("Neural network creation",1)
 
 from support_data_structures import networks
 
-net = networks.AttentivePoolingNetwork((M_len, L_len), len(vocab), word_embedding_size, word2vec_embedding_matrix, device, type_of_nn='CNN', convolutional_filters=convolutional_filters, context_len=k).to(device)
+net = networks.AttentivePoolingNetwork((M_len, L_len), len(vocab), word_embedding_size, word2vec_embedding_matrix, device, type_of_nn=sys.argv[1], convolutional_filters=convolutional_filters, context_len=k).to(device)
 #print(net)
 sprint("NN Instantiated", 2)
 
@@ -300,7 +301,7 @@ for epoch in range(training_epochs):
     #loss = sum((outputs_pos - 1)**2 + (outputs_neg)**2)
 
     sprint("Epoch %d, loss: %2.3f" % (epoch+1, loss.item()), 3)
-    loss.backward()
+    loss.backward(retain_graph=True)
     optimizer.step()    # Does the update
 
     ## Validation
