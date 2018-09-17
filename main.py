@@ -9,6 +9,8 @@ from torch import optim
 from itertools import chain
 from data_loader import loader
 from termcolor import cprint
+import numpy
+from time import time
 
 def sprint(stringa, indent):
     color = {
@@ -33,6 +35,7 @@ train, valid, test = loader.Loader('WikiQA').load()
 ### REMOVE USELESS ENTRIES
 ################################################################################
 
+## true if the question has at least one positive and one negative answer
 def has_each_label(ds):
     res = []
     for entry in ds:
@@ -86,6 +89,59 @@ valid = clean_dataset(valid)
 sprint('Validation done', 2)
 test = clean_dataset(test)
 sprint('Test done', 2)
+
+
+################################################################################
+### STATISTICS
+################################################################################
+sprint("Statistics on the 3 datasets", 1)
+## TRAIN
+average_pos_number = numpy.mean(list(map(lambda a: sum(map(lambda b: b['label'], a['candidates'])), train)))
+average_neg_number = numpy.mean(list(map(lambda a: sum(map(lambda b: 1 - b['label'], a['candidates'])), train)))
+
+average_question_len = numpy.mean(list(map(lambda a: len(a['question']), train)))
+tmp = []
+for entry in train:
+    for ans in entry['candidates']:
+        tmp.append(len(ans['sentence']))
+average_answer_len = numpy.mean(tmp)
+sprint("TRAIN set stats:", 2)
+sprint("average number of positive answers: %.2f" % average_pos_number, 3)
+sprint("average number of negative answers: %.2f" % average_neg_number, 3)
+sprint("average questions length: %.2f" % average_question_len, 3)
+sprint("average answers length: %.2f" % average_answer_len, 3)
+
+## VALIDATION
+average_pos_number = numpy.mean(list(map(lambda a: sum(map(lambda b: b['label'], a['candidates'])), valid)))
+average_neg_number = numpy.mean(list(map(lambda a: sum(map(lambda b: 1 - b['label'], a['candidates'])), valid)))
+
+average_question_len = numpy.mean(list(map(lambda a: len(a['question']), valid)))
+tmp = []
+for entry in valid:
+    for ans in entry['candidates']:
+        tmp.append(len(ans['sentence']))
+average_answer_len = numpy.mean(tmp)
+sprint("VALIDATION set stats:", 2)
+sprint("average number of positive answers: %.2f" % average_pos_number, 3)
+sprint("average number of negative answers: %.2f" % average_neg_number, 3)
+sprint("average questions length: %.2f" % average_question_len, 3)
+sprint("average answers length: %.2f" % average_answer_len, 3)
+
+## TEST
+average_pos_number = numpy.mean(list(map(lambda a: sum(map(lambda b: b['label'], a['candidates'])), test)))
+average_neg_number = numpy.mean(list(map(lambda a: sum(map(lambda b: 1 - b['label'], a['candidates'])), test)))
+
+average_question_len = numpy.mean(list(map(lambda a: len(a['question']), test)))
+tmp = []
+for entry in test:
+    for ans in entry['candidates']:
+        tmp.append(len(ans['sentence']))
+average_answer_len = numpy.mean(tmp)
+sprint("TEST set stats:", 2)
+sprint("average number of positive answers: %.2f" % average_pos_number, 3)
+sprint("average number of negative answers: %.2f" % average_neg_number, 3)
+sprint("average questions length: %.2f" % average_question_len, 3)
+sprint("average answers length: %.2f" % average_answer_len, 3)
 
 
 ################################################################################
@@ -159,6 +215,7 @@ loss_margin = 0.5
 training_epochs = 20
 n_threads = 8
 word_embedding_window = 3
+output_thres = .0
 
 def get_device():
     if torch.cuda.is_available():
@@ -272,55 +329,47 @@ sprint("Training NN",1)
 optimizer = optim.SGD(net.parameters(), lr=initial_learning_rate)
 net.train()
 
-#print([x.size() for x in list(net.parameters())])
-
-from time import time
-starting_time = time()
-sprint('Batch size: %d' % batch_size, 2)
-
-sprint("Starting",2)
-for epoch in range(training_epochs):
-    questions, inputs_pos, inputs_neg = train_ds.next()
-
+def train(questions, answers, labels):
     optimizer.zero_grad()   # zero the gradient buffers
+    output = net(questions, answers)
+    loss = torch.stack([torch.tensor(0.).to(device), loss_margin + output[1:].max() - output[0]], dim=0).max()
+    loss.backward()
+    optimizer.step()    # Does the update
+    return loss.item()
 
-    outputs_pos = net(questions, inputs_pos)
-    outputs_neg = net(questions, inputs_neg)
+def test(questions, answers, labels):
+    output = net(questions, answers) > output_thres
+    output = output.long()
+    true_pos = (labels.__and__(output)).sum().item()
+    false_neg = (labels.__and__(1 - output)).sum().item()
+    true_neg = ((1 - labels).__and__(1 - output)).sum().item()
+    false_pos = ((1 - labels).__and__(output)).sum().item()
 
-    sum = loss_margin + outputs_neg - outputs_pos
-    ## to do the max between the results and 0 we place a tensor filled with zero side by side with the results tensor
-    res = torch.stack([sum, torch.zeros(batch_size, requires_grad=False).to(device)]).transpose(0,1).view(1,batch_size,2)
+    accuracy = (true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos) if (true_pos+true_neg+false_neg+false_pos) else 0
+    precision = true_pos / (true_pos+false_pos) if (true_pos+false_pos) else 0
+    recall =  true_pos / (true_pos+false_neg) if (true_pos+false_neg) else 0
 
-    ## maxpooling on each tuple (res[i], 0)
-    maxpoller = torch.nn.MaxPool1d(2)
-
-    loss = (maxpoller(res)**2).mean()
-
-    #trials
-    #loss = ((outputs_pos - 1.)**2 + (outputs_neg)**2).sum()
-    #loss = sum((outputs_pos - 1)**2 + (outputs_neg)**2)
+    # Accuracy, Precision, Recall
+    return ( accuracy, precision, recall )
 
     sprint("Epoch %d, loss: %2.3f" % (epoch+1, loss.item()), 3)
     loss.backward(retain_graph=True)
     optimizer.step()    # Does the update
 
-    ## Validation
-    thres = 0
-    quest, valid_pos, valid_neg = valid_ds.next()
+#print([x.size() for x in list(net.parameters())])
+starting_time = time()
+sprint('Batch size: %d' % batch_size, 2)
 
-    valid_outputs_pos = net(quest, valid_pos) > thres
-    valid_outputs_neg = net(quest, valid_neg) > thres
-    #print(valid_outputs_pos)
-    #print(valid_outputs_neg)
-    true_pos = torch.nonzero(valid_outputs_pos).size(0)
-    false_neg = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_pos).size(0)
-    true_neg = torch.nonzero(valid_outputs_neg).size(0)
-    false_pos = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_neg).size(0)
-    #print(true_pos, true_neg, false_pos, false_neg)
+sprint("Starting",2)
+for epoch in range(training_epochs):
 
-    sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % ((true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos), true_pos/ (true_pos+false_pos), true_pos/ (true_pos+false_neg) ), 4)
+    # train
+    sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.next())), 3)
+    # validation
+    sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)
 
 sprint('Training took %.2f seconds' % (time()-starting_time), 2)
+
 
 ################################################################################
 ### TESTING THE NETWORK
@@ -335,29 +384,22 @@ prec_array = []
 
 round = 1
 sprint('Starting', 2)
+
 while True:
     input = test_ds.ordered_next()
     if input is None:
         break
-    questions, inputs_pos, inputs_neg = input
+    else:
+        acc, prec, rec = test(*input)
 
-    valid_outputs_pos = net(quest, valid_pos) > thres
-    valid_outputs_neg = net(quest, valid_neg) > thres
+        accu_array.append(acc)
+        recall_array.append(rec)
+        prec_array.append(prec)
 
-    true_pos = torch.nonzero(valid_outputs_pos).size(0)
-    false_neg = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_pos).size(0)
-    true_neg = torch.nonzero(valid_outputs_neg).size(0)
-    false_pos = valid_outputs_pos.size(0) - torch.nonzero(valid_outputs_neg).size(0)
-
-    accu_array.append((true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos))
-    recall_array.append(true_pos/ (true_pos+false_neg))
-    prec_array.append(true_pos/ (true_pos+false_pos))
-
-    sprint('Round %d done! (%d elements tested)' % (round, len(questions)), 3)
-    round += 1
+        sprint('Round %d' % round, 3)
+        round += 1
 
 
-import numpy
 sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % (numpy.mean(accu_array), numpy.mean(prec_array), numpy.mean(recall_array)), 2)
 
 sprint('Testing took %.2f seconds' % (time()-starting_time), 2)

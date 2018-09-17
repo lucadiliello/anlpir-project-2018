@@ -114,7 +114,6 @@ class AttentivePoolingNetwork(nn.Module):
 
     def forward(self, question, answer):
         ## get batch_size
-        assert(question.size()[0] == answer.size()[0])
         batch_size = question.size()[0]
 
         question = self.embed(question)
@@ -149,8 +148,13 @@ class AttentivePoolingNetwork(nn.Module):
         Q = Q.transpose(1,2)
         ## bs * c * M
 
-        rQ = Q.bmm(max_pool_Q).view(-1, self.convolutional_filters)
-        rA = A.bmm(max_pool_A).view(-1, self.convolutional_filters)
+        roQ = self.softmax(max_pool_Q)
+        ## bs * M * 1
+        roA = self.softmax(max_pool_A)
+        ## bs * L * 1
+
+        rQ = Q.bmm(roQ).view(-1, self.convolutional_filters)
+        rA = A.bmm(roA).view(-1, self.convolutional_filters)
         # rA=rQ : bs * c
 
         return self.sim(rQ, rA)
