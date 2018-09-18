@@ -23,6 +23,13 @@ def sprint(stringa, indent):
 
     cprint(stringa, color[indent])
 
+
+if len(sys.argv) != 2 or sys.argv[1] not in ['CNN', 'biLSTM']:
+    print("Usage: ./main.py <CNN|biLSTM>")
+    exit(0)
+else:
+    network_type = sys.argv[1]
+
 ################################################################################
 ### LOAD DATASET
 ################################################################################
@@ -94,6 +101,7 @@ sprint('Test done', 2)
 ################################################################################
 ### STATISTICS
 ################################################################################
+
 sprint("Statistics on the 3 datasets", 1)
 ## TRAIN
 average_pos_number = numpy.mean(list(map(lambda a: sum(map(lambda b: b['label'], a['candidates'])), train)))
@@ -306,7 +314,6 @@ sprint("Done validation",2)
 test_ds = datasets.BatchCreator(test, batch_size, device)
 sprint("Done test",2)
 
-
 ################################################################################
 ### NEURAL NETWORK
 ################################################################################
@@ -314,8 +321,8 @@ sprint("Done test",2)
 sprint("Neural network creation",1)
 
 from support_data_structures import networks
-
-net = networks.AttentivePoolingNetwork((M_len, L_len), len(vocab), word_embedding_size, word2vec_embedding_matrix, device, type_of_nn=sys.argv[1], convolutional_filters=convolutional_filters, context_len=k).to(device)
+from support_data_structures import metrics
+net = networks.AttentivePoolingNetwork((M_len, L_len), len(vocab), word_embedding_size, word2vec_embedding_matrix, device, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
 #print(net)
 sprint("NN Instantiated", 2)
 
@@ -340,21 +347,14 @@ def train(questions, answers, labels):
 def test(questions, answers, labels):
     output = net(questions, answers) > output_thres
     output = output.long()
-    true_pos = (labels.__and__(output)).sum().item()
-    false_neg = (labels.__and__(1 - output)).sum().item()
-    true_neg = ((1 - labels).__and__(1 - output)).sum().item()
-    false_pos = ((1 - labels).__and__(output)).sum().item()
 
-    accuracy = (true_pos+true_neg) / (true_pos+true_neg+false_neg+false_pos) if (true_pos+true_neg+false_neg+false_pos) else 0
-    precision = true_pos / (true_pos+false_pos) if (true_pos+false_pos) else 0
-    recall =  true_pos / (true_pos+false_neg) if (true_pos+false_neg) else 0
+    accuracy = metrics.accuracy(output, labels)
+    precision = metrics.precision(output, labels)
+    recall = metrics.recall(output, labels)
 
     # Accuracy, Precision, Recall
     return ( accuracy, precision, recall )
 
-    sprint("Epoch %d, loss: %2.3f" % (epoch+1, loss.item()), 3)
-    loss.backward(retain_graph=True)
-    optimizer.step()    # Does the update
 
 #print([x.size() for x in list(net.parameters())])
 starting_time = time()
@@ -383,10 +383,11 @@ recall_array = []
 prec_array = []
 
 round = 1
+test_round = 10
 sprint('Starting', 2)
 
-while True:
-    input = test_ds.ordered_next()
+while round < test_round:
+    input = test_ds.test_batch(balanced=True, size=100)
     if input is None:
         break
     else:

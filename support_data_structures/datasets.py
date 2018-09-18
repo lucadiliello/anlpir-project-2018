@@ -43,3 +43,28 @@ class BatchCreator(object):
         res = self.question_to_batch(self.last_index)
         self.last_index += 1
         return res
+
+    def test_batch(self, balanced=True, size=None):
+        if not size:
+            size = self.batch_size
+        if not balanced:
+            return next()
+        else:
+            domande, risposte, labels = ([],[],[])
+
+            while len(domande) < size:
+                index = random.randint(0, len(self.data) - 1)
+                entry = self.data[index]
+                actual_len = min(len(entry['candidates_pos']), len(entry['candidates_neg']))
+                risposte += random.sample(entry['candidates_pos'], actual_len) + random.sample(entry['candidates_neg'], actual_len)
+                domande += [entry['question']] * actual_len * 2
+                labels += ([1] * actual_len) + ([0] * actual_len)
+
+            domande = domande[:size]
+            risposte = risposte[:size]
+            labels = labels[:size]
+
+            c = list(zip(domande, risposte, labels))
+            random.shuffle(c)
+            domande, risposte, labels = zip(*c)
+            return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device), torch.tensor(labels).to(self.device)
