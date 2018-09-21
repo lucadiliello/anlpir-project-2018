@@ -11,6 +11,7 @@ from data_loader import loader
 from termcolor import cprint
 import numpy
 from time import time
+import pickle
 
 def sprint(stringa, indent):
     color = {
@@ -25,7 +26,7 @@ def sprint(stringa, indent):
 
 
 if len(sys.argv) != 2 or sys.argv[1] not in ['CNN', 'biLSTM']:
-    print("Usage: ./main.py <CNN|biLSTM>")
+    print("Usage: ./main.py < CNN | biLSTM >")
     exit(0)
 else:
     network_type = sys.argv[1]
@@ -220,10 +221,10 @@ convolutional_filters = 400
 batch_size = 20
 initial_learning_rate = 1.1
 loss_margin = 0.5
-training_epochs = 20
+training_epochs = 25
 n_threads = 8
 word_embedding_window = 3
-output_thres = .0
+output_thres = 0
 
 def get_device():
     if torch.cuda.is_available():
@@ -242,12 +243,20 @@ sprint('Will train on %s' % (torch.cuda.get_device_name(device.index) if device.
 ################################################################################
 
 sprint('Training the word2vec encoder', 1)
-## sudo pip3 install cython - to speed up embedding
-## # TODO: save training model to disk to speed up starting
-model = gensim.models.Word2Vec(documents, size=word_embedding_size, window=word_embedding_window, min_count=0, workers=n_threads)
-model.train(documents, total_examples=len(documents), epochs=100)
 
-sprint('Trained', 2)
+try:
+    model = pickle.load(open("model.pickle", "rb"))
+except (OSError, IOError) as e:
+    sprint('Model does not exist, creating it', 2)
+    ## sudo pip3 install cython - to speed up embedding
+    ## # TODO: save training model to disk to speed up starting
+    model = gensim.models.Word2Vec(documents, size=word_embedding_size, window=word_embedding_window, min_count=0, workers=n_threads)
+    model.train(documents, total_examples=len(documents), epochs=100)
+    sprint('Trained', 2)
+
+    pickle.dump(model, open("model.pickle", "wb"))
+    sprint('Saving to disk', 2)
+
 word2vec_embedding_matrix = torch.FloatTensor(model.wv.syn0).to(device)
 sprint('Done', 2)
 
@@ -333,15 +342,28 @@ sprint("NN Instantiated", 2)
 sprint("Training NN",1)
 
 # create your optimizer
+'''
+for x in net.parameters():
+    print(x.size())
+'''
+
 optimizer = optim.SGD(net.parameters(), lr=initial_learning_rate)
 net.train()
+#criterion = nn.MSELoss()
 
 def train(questions, answers, labels):
     optimizer.zero_grad()   # zero the gradient buffers
     output = net(questions, answers)
-    loss = torch.stack([torch.tensor(0.).to(device), loss_margin + output[1:].max() - output[0]], dim=0).max()
-    loss.backward(retain_graph=True)
+    loss = torch.stack([torch.tensor(0.).to(device), loss_margin - output[0] + output[1:].max()], dim=0).max()
+    #loss = loss_margin + output[1:].max() - output[0]
+    #loss = criterion(labels.float(), output)
+    #loss.backward(retain_graph=True)
+    loss.backward()
     optimizer.step()    # Does the update
+    '''
+    for param in net.parameters():
+        print(param.grad.data.sum())
+    '''
     return loss.item()
 
 def test(questions, answers, labels):
@@ -365,8 +387,9 @@ for epoch in range(training_epochs):
 
     # train
     sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.next())), 3)
+    #sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.test_batch(balanced=True, size=20))), 3)
     # validation
-    sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)
+    #sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)
 
 sprint('Training took %.2f seconds' % (time()-starting_time), 2)
 
@@ -383,7 +406,7 @@ recall_array = []
 prec_array = []
 
 round = 1
-test_round = 10
+test_round = 20
 sprint('Starting', 2)
 
 while round < test_round:

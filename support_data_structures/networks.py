@@ -13,19 +13,32 @@ class QA_CNN(nn.Module):
         self.context_len = context_len
 
         self.conv2 = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+        #self.lin = nn.Linear(self.context_len * self.embedding_size, self.convolutional_filters, bias=True)
 
     def forward(self, x):
         ## x: bs * M * d
 
         x = self.sentence_to_Z_vector(x)
         ## bs * M * dk
+        '''
+        x = self.lin(x)
+        ## bs * M * c
+        x.transpose_(1,2)
+        print(x.size())
+        # bs * c * M
+        return x
+        '''
+
         x = x.view(-1, 1, self.max_len, self.embedding_size * self.context_len)
         ## bs * 1 * M * dk
 
         x = x.transpose(2,3)
         ## bs * 1 * dk * M
 
-        x = self.conv2(x).view(-1, self.convolutional_filters, self.max_len)
+        x = self.conv2(x)
+        ## bs * c * 1 * M
+
+        x = x.view(-1, self.convolutional_filters, self.max_len)
         ## bs * c * M
 
         return x
@@ -100,7 +113,7 @@ class AttentivePoolingNetwork(nn.Module):
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
-        self.U = torch.randn(self.convolutional_filters, self.convolutional_filters).to(self.device)
+        self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
 
         self.tanh = nn.Tanh()
         self.extract_q_feats = nn.MaxPool1d(self.L)
@@ -115,14 +128,14 @@ class AttentivePoolingNetwork(nn.Module):
         batch_size = question.size()[0]
 
         question = self.embed(question)
-        ## bs * M * kd
+        ## bs * M * d
 
         Q = self.question_cnn_bilstm(question)
         ## bs * c * M
 
         answer = self.embed(answer)
         #print(answer.size())
-        ## bs * L * kd
+        ## bs * L * d
         A = self.answer_cnn_bilstm(answer)
         ## bs * c * L
 
