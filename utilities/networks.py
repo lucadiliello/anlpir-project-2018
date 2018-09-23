@@ -87,21 +87,16 @@ class QA_biLSTM(nn.Module):
 
 class AttentivePoolingNetwork(nn.Module):
 
-    def __init__(self, max_len, vocab_size, embedding_size, embedding_matrix, device, type_of_nn='CNN', convolutional_filters=400, context_len=3):
+    def __init__(self, max_len, embedding_size, device, type_of_nn='CNN', convolutional_filters=400, context_len=3):
         super(AttentivePoolingNetwork, self).__init__()
 
         self.device = device
-
         self.M, self.L = max_len
-        self.vocab_size = vocab_size
-        self.embedding_size = embedding_size
+
         ## params of the CNN
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
-
-        ## embedding
-        self.embed = nn.Embedding(self.vocab_size, self.embedding_size, padding_idx=0)
-        self.embed.from_pretrained(embedding_matrix, freeze=True)
+        self.embedding_size = embedding_size
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
@@ -127,15 +122,12 @@ class AttentivePoolingNetwork(nn.Module):
         ## get batch_size
         batch_size = question.size()[0]
 
-        question = self.embed(question)
-        ## bs * M * d
+        ## question: bs * M * d
+        ## answer: bs * L * d
 
         Q = self.question_cnn_bilstm(question)
         ## bs * c * M
 
-        answer = self.embed(answer)
-        #print(answer.size())
-        ## bs * L * d
         A = self.answer_cnn_bilstm(answer)
         ## bs * c * L
 

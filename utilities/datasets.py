@@ -22,6 +22,9 @@ class DatasetManager(object):
 
         self.train, self.valid, self.test = loader.Loader(dataset_name).load()
 
+        ### init to train()
+        self.data = self.train
+
 
         ### SHUFFLING DATASET
         shuffle(self.train)
@@ -137,7 +140,7 @@ class DatasetManager(object):
 
     def get_statistics(self):
         results = {}
-        
+
         res = {}
         res['average_number_pos_answers'] = numpy.mean(list(map(lambda a: len(a['candidates_pos']), self.original_train)))
         res['average_number_neg_answers'] = numpy.mean(list(map(lambda a: len(a['candidates_neg']), self.original_train)))
@@ -160,6 +163,19 @@ class DatasetManager(object):
         results['test'] = res
 
         return results
+
+
+    def train_mode(self):
+        self.reset_index()
+        self.data = self.train
+
+    def validation_mode(self):
+        self.reset_index()
+        self.data = self.valid
+
+    def test_mode(self):
+        self.reset_index()
+        self.data = self.test
 
 
     def reset_index(self):

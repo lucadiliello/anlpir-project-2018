@@ -8,6 +8,7 @@ from torch import optim
 from time import time
 import argparse
 from utilities import networks, metrics, sprint, datasets
+import numpy
 
 
 ################################################################################
@@ -31,8 +32,8 @@ dataset_name = args.dataset_name
 sprint.p('Loading the Google News Word Embedding model', 1)
 
 starting_time = time()
-model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
-#model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
+#model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
 sprint.p('Loading took %d seconds' % (time()-starting_time), 2)
 
 sprint.p('Done', 2)
@@ -49,10 +50,8 @@ convolutional_filters = 400
 batch_size = 20
 initial_learning_rate = 1.1
 loss_margin = 0.5
-training_epochs = 25
-n_threads = 8
-word_embedding_window = 3
-output_thres = 0
+training_epochs = 100
+output_thres = 0.
 
 def get_device():
     if torch.cuda.is_available():
@@ -97,15 +96,15 @@ sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['av
 ################################################################################
 
 sprint.p("Neural network creation",1)
-net = networks.AttentivePoolingNetwork((dataset.max_question_len, dataset.max_answer_len), device, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
+net = networks.AttentivePoolingNetwork((dataset.max_question_len, dataset.max_answer_len), word_embedding_size, device, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
 #print(net)
-sprinsprint.pt("NN Instantiated", 2)
+sprint.p("NN Instantiated", 2)
 
 ################################################################################
 ### TRAINING NETWORK
 ################################################################################
 
-sprint("Training NN",1)
+sprint.p("Training NN",1)
 
 # create your optimizer
 #for x in net.parameters():
@@ -114,12 +113,13 @@ sprint("Training NN",1)
 
 optimizer = optim.SGD(net.parameters(), lr=initial_learning_rate)
 net.train()
-#criterion = nn.MSELoss()
+dataset.train_mode()
+criterion = nn.MSELoss()
 
 def train(questions, answers, labels):
     optimizer.zero_grad()   # zero the gradient buffers
     output = net(questions, answers)
-    loss = torch.stack([torch.tensor(0.).to(device), loss_margin - output[0] + output[1:].max()], dim=0).max()
+    loss = max(torch.tensor(0.).to(device), (loss_margin - output[0] + output[1:].max()) )
     #loss = loss_margin + output[1:].max() - output[0]
     #loss = criterion(labels.float(), output)
     #loss.backward(retain_graph=True)
@@ -145,25 +145,25 @@ def test(questions, answers, labels):
 
 #print([x.size() for x in list(net.parameters())])
 starting_time = time()
-sprint('Batch size: %d' % batch_size, 2)
+sprint.p('Batch size: %d' % batch_size, 2)
 
-sprint("Starting",2)
+sprint.p("Starting",2)
 for epoch in range(training_epochs):
 
     # train
-    sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.next())), 3)
+    sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, train(*dataset.next())), 3)
     #sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.test_batch(balanced=True, size=20))), 3)
     # validation
     #sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)
 
-sprint('Training took %.2f seconds' % (time()-starting_time), 2)
+sprint.p('Training took %.2f seconds' % (time()-starting_time), 2)
 
 
 ################################################################################
 ### TESTING THE NETWORK
 ################################################################################
 
-sprint("Testing NN", 1)
+sprint.p("Testing NN", 1)
 
 starting_time = time()
 accu_array = []
@@ -172,10 +172,12 @@ prec_array = []
 
 round = 1
 test_round = 20
-sprint('Starting', 2)
+dataset.test_mode()
+
+sprint.p('Starting', 2)
 
 while round < test_round:
-    input = test_ds.test_batch(balanced=True, size=100)
+    input = dataset.test_batch(balanced=True, size=100)
     if input is None:
         break
     else:
@@ -185,10 +187,10 @@ while round < test_round:
         recall_array.append(rec)
         prec_array.append(prec)
 
-        sprint('Round %d' % round, 3)
+        sprint.p('Round %d' % round, 3)
         round += 1
 
 
-sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % (numpy.mean(accu_array), numpy.mean(prec_array), numpy.mean(recall_array)), 2)
+sprint.p('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % (numpy.mean(accu_array), numpy.mean(prec_array), numpy.mean(recall_array)), 2)
 
-sprint('Testing took %.2f seconds' % (time()-starting_time), 2)
+sprint.p('Testing took %.2f seconds' % (time()-starting_time), 2)
