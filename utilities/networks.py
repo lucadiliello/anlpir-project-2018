@@ -20,6 +20,7 @@ class QA_CNN(nn.Module):
 
         x = self.sentence_to_Z_vector(x)
         ## bs * M * dk
+
         '''
         x = self.lin(x)
         ## bs * M * c

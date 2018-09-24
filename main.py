@@ -50,7 +50,7 @@ convolutional_filters = 400
 batch_size = 20
 initial_learning_rate = 1.1
 loss_margin = 0.5
-training_epochs = 100
+training_epochs = 25
 output_thres = 0.
 
 def get_device():
