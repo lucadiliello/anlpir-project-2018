@@ -12,15 +12,28 @@ class QA_CNN(nn.Module):
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
 
-        self.conv2 = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+        self.W = nn.Parameter(torch.Tensor(self.convolutional_filters, self.embedding_size * self.context_len))
+        self.b = nn.Parameter(torch.Tensor(self.convolutional_filters, self.max_len))
+        #self.conv2 = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
         #self.lin = nn.Linear(self.context_len * self.embedding_size, self.convolutional_filters, bias=True)
+        #self.tanh = nn.Tanh()
 
     def forward(self, x):
         ## x: bs * M * d
 
-        x = self.sentence_to_Z_vector(x)
-        ## bs * M * dk
+        x = self.sentence_to_Z_vector(x).transpose_(1,2)
+        ## bs * dk * M
 
+        batch_size = x.size()[0]
+
+        res = torch.Tensor(batch_size, self.convolutional_filters, self.max_len)
+
+        for b in range(batch_size):
+            #res[b] = self.tanh(self.W.mm(x[b]) + self.b)
+            res[b] = self.W.mm(x[b]) + self.b
+        ## bs * c * M
+
+        return res
         '''
         x = self.lin(x)
         ## bs * M * c
@@ -101,7 +114,7 @@ class AttentivePoolingNetwork(nn.Module):
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
-            self.question_cnn_bilstm = QA_CNN(self.M, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
+            self.cnn_bilstm = QA_CNN(self.M, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
             self.answer_cnn_bilstm = QA_CNN(self.L, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
         elif type_of_nn == 'biLSTM':
             self.question_cnn_bilstm = QA_biLSTM(self.M, self.embedding_size, self.convolutional_filters, self.device)
@@ -109,13 +122,9 @@ class AttentivePoolingNetwork(nn.Module):
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
-        self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
-
         self.tanh = nn.Tanh()
-        self.extract_q_feats = nn.MaxPool1d(self.L)
-        self.extract_a_feats = nn.MaxPool1d(self.M)
-
-        self.softmax = nn.Softmax(dim=0)
+        self.extract_q_feats = nn.MaxPool1d(self.M)
+        self.extract_a_feats = nn.MaxPool1d(self.L)
 
         self.sim = nn.CosineSimilarity(dim=1, eps=1e-6)
 
@@ -132,34 +141,11 @@ class AttentivePoolingNetwork(nn.Module):
         A = self.answer_cnn_bilstm(answer)
         ## bs * c * L
 
-        ## transpose does not make a copy of the tensor, it only swaps the access indexes.
-        ## To make a complete new copy use .contiguous()
-        Q = Q.transpose(1,2).contiguous()
-        ## bs * M * c
+        rQ = self.tanh(self.extract_q_feats(Q).view(-1, self.convolutional_filters))
+        ## bs * c
 
-        res = torch.mm(Q.view(batch_size * self.M, self.convolutional_filters), self.U).view(batch_size, self.M, self.convolutional_filters).bmm(A)
-        ## bs * M * L
-
-        G = self.tanh(res)
-        ## bs * M * L
-
-        max_pool_Q = self.extract_q_feats(G).view(-1, self.M, 1)
-        ## bs * M * 1
-
-        max_pool_A = self.extract_a_feats(G.transpose(1,2)).view(-1, self.L, 1)
-        ## bs * L * 1
-
-        Q = Q.transpose(1,2)
-        ## bs * c * M
-
-        roQ = self.softmax(max_pool_Q)
-        ## bs * M * 1
-        roA = self.softmax(max_pool_A)
-        ## bs * L * 1
-
-        rQ = Q.bmm(roQ).view(-1, self.convolutional_filters)
-        rA = A.bmm(roA).view(-1, self.convolutional_filters)
-        # rA=rQ : bs * c
+        rA = self.tanh(self.extract_a_feats(A).view(-1, self.convolutional_filters))
+        ## bs * c
 
         return self.sim(rQ, rA)
         ## bs

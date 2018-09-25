@@ -19,10 +19,12 @@ parser = argparse.ArgumentParser(description='Create an AP network for Question 
 
 parser.add_argument("-n", help="type of the network, either CNN or biLSTM", type=str, default='CNN', dest='network_type', choices=['CNN','biLSTM'])
 parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=str, default='TrecQA', dest='dataset_name', choices=['TrecQA','WikiQA'])
+parser.add_argument("-r", help="Use reduced GoogleNews word2vec embedding for faster loading", action='store_true', dest='use_google_news')
 
 args = parser.parse_args()
 network_type = args.network_type
 dataset_name = args.dataset_name
+use_google_news = args.use_google_news
 
 
 ################################################################################
@@ -32,8 +34,10 @@ dataset_name = args.dataset_name
 sprint.p('Loading the Google News Word Embedding model', 1)
 
 starting_time = time()
-#model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
-model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
+if use_google_news:
+    model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+else:
+    model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
 sprint.p('Loading took %d seconds' % (time()-starting_time), 2)
 
 sprint.p('Done', 2)
