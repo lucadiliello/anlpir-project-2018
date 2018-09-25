@@ -3,52 +3,53 @@ import torch.nn as nn
 
 class QA_CNN(nn.Module):
 
-    def __init__(self, max_len, embedding_size, convolutional_filters, context_len, device):
+    def __init__(self, max_len_Q, max_len_A, embedding_size, convolutional_filters, context_len, device):
         super(QA_CNN, self).__init__()
 
         self.device = device
-        self.max_len = max_len
+        self.max_len_Q = max_len_Q
+        self.max_len_A = max_len_A
         self.embedding_size = embedding_size
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
 
         self.conv2 = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
-        #self.lin = nn.Linear(self.context_len * self.embedding_size, self.convolutional_filters, bias=True)
 
-    def forward(self, x):
-        ## x: bs * M * d
+    def forward(self, question, answer):
+        ## question: bs * M * d
+        ## answer: bs * L * d
 
-        x = self.sentence_to_Z_vector(x)
+        question = self.sentence_to_Z_vector(question, self.max_len_Q)
         ## bs * M * dk
 
-        '''
-        x = self.lin(x)
-        ## bs * M * c
-        x.transpose_(1,2)
-        print(x.size())
-        # bs * c * M
-        return x
-        '''
+        answer = self.sentence_to_Z_vector(answer, self.max_len_A)
+        ## bs * L * dk
 
-        x = x.view(-1, 1, self.max_len, self.embedding_size * self.context_len)
+        question = question.view(-1, 1, self.max_len_Q, self.embedding_size * self.context_len)
         ## bs * 1 * M * dk
 
-        x = x.transpose(2,3)
+        answer = answer.view(-1, 1, self.max_len_A, self.embedding_size * self.context_len)
+        ## bs * 1 * L * dk
+
+        question.transpose_(2,3)
         ## bs * 1 * dk * M
 
-        x = self.conv2(x)
-        ## bs * c * 1 * M
+        answer.transpose_(2,3)
+        ## bs * 1 * dk * M
 
-        x = x.view(-1, self.convolutional_filters, self.max_len)
+        question = self.conv2(question).squeeze()
         ## bs * c * M
 
-        return x
+        answer = self.conv2(answer).squeeze()
+        ## bs * c * M
 
-    def sentence_to_Z_vector(self, sentences):
+        return question, answer
+
+    def sentence_to_Z_vector(self, sentences, length):
         tot = []
         for sentence in sentences:
             res = []
-            for index in range(self.max_len):
+            for index in range(length):
                 tmp = [None] * self.context_len
                 for disc in range(-int(self.context_len/2), int(self.context_len/2) + 1):
                     tmp[disc + int(self.context_len/2)] = sentence[(index + disc)] if (index + disc) >= 0 and (index + disc) < len(sentence) else self.pad_tensor()
@@ -86,6 +87,7 @@ class QA_biLSTM(nn.Module):
         ## bs*c*M
         return out
 
+
 class AttentivePoolingNetwork(nn.Module):
 
     def __init__(self, max_len, embedding_size, device, type_of_nn='CNN', convolutional_filters=400, context_len=3):
@@ -101,8 +103,7 @@ class AttentivePoolingNetwork(nn.Module):
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
-            self.question_cnn_bilstm = QA_CNN(self.M, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
-            self.answer_cnn_bilstm = QA_CNN(self.L, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
+            self.cnn_bilstm = QA_CNN(self.M, self.L, self.embedding_size, self.convolutional_filters, self.context_len, self.device)
         elif type_of_nn == 'biLSTM':
             self.question_cnn_bilstm = QA_biLSTM(self.M, self.embedding_size, self.convolutional_filters, self.device)
             self.answer_cnn_bilstm = QA_biLSTM(self.L, self.embedding_size, self.convolutional_filters, self.device)
@@ -115,7 +116,7 @@ class AttentivePoolingNetwork(nn.Module):
         self.extract_q_feats = nn.MaxPool1d(self.L)
         self.extract_a_feats = nn.MaxPool1d(self.M)
 
-        self.softmax = nn.Softmax(dim=0)
+        self.softmax = nn.Softmax(dim=1)
 
         self.sim = nn.CosineSimilarity(dim=1, eps=1e-6)
 
@@ -126,18 +127,14 @@ class AttentivePoolingNetwork(nn.Module):
         ## question: bs * M * d
         ## answer: bs * L * d
 
-        Q = self.question_cnn_bilstm(question)
-        ## bs * c * M
+        Q, A = self.cnn_bilstm(question, answer)
+        ## Q: bs * c * M
+        ## A: bs * c * L
 
-        A = self.answer_cnn_bilstm(answer)
-        ## bs * c * L
-
-        ## transpose does not make a copy of the tensor, it only swaps the access indexes.
-        ## To make a complete new copy use .contiguous()
-        Q = Q.transpose(1,2).contiguous()
-        ## bs * M * c
-
-        res = torch.mm(Q.view(batch_size * self.M, self.convolutional_filters), self.U).view(batch_size, self.M, self.convolutional_filters).bmm(A)
+        res = torch.Tensor(batch_size, self.M, self.L)
+        for i in range(batch_size):
+            res[i] = Q[i].transpose(0,1).mm(self.U).mm(A[i])
+        #res = torch.mm(Q.view(batch_size * self.M, self.convolutional_filters), self.U).view(batch_size, self.M, self.convolutional_filters).bmm(A)
         ## bs * M * L
 
         G = self.tanh(res)
@@ -148,9 +145,6 @@ class AttentivePoolingNetwork(nn.Module):
 
         max_pool_A = self.extract_a_feats(G.transpose(1,2)).view(-1, self.L, 1)
         ## bs * L * 1
-
-        Q = Q.transpose(1,2)
-        ## bs * c * M
 
         roQ = self.softmax(max_pool_Q)
         ## bs * M * 1

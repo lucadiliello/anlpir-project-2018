@@ -19,11 +19,11 @@ parser = argparse.ArgumentParser(description='Create an AP network for Question 
 
 parser.add_argument("-n", help="type of the network, either CNN or biLSTM", type=str, default='CNN', dest='network_type', choices=['CNN','biLSTM'])
 parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=str, default='TrecQA', dest='dataset_name', choices=['TrecQA','WikiQA'])
-
+parser.add_argument("-r", help="Use reduced GoogleNews WE model", action="store_true", dest="user_red_model")
 args = parser.parse_args()
 network_type = args.network_type
 dataset_name = args.dataset_name
-
+user_red_model = args.user_red_model
 
 ################################################################################
 ### LOADING WORD EMBEDDINGS GOOGLE-NEWS MODEL
@@ -32,8 +32,10 @@ dataset_name = args.dataset_name
 sprint.p('Loading the Google News Word Embedding model', 1)
 
 starting_time = time()
-#model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
-model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
+if user_red_model:
+    model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+else:
+    model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
 sprint.p('Loading took %d seconds' % (time()-starting_time), 2)
 
 sprint.p('Done', 2)
@@ -48,10 +50,10 @@ k = 3 # 3, 5, 7
 word_embedding_size = model.syn0.shape[1]
 convolutional_filters = 400
 batch_size = 20
-initial_learning_rate = 1.1
+learning_rate = 1.1
 loss_margin = 0.5
 training_epochs = 25
-output_thres = 0.
+test_rounds = 40
 
 def get_device():
     if torch.cuda.is_available():
@@ -106,52 +108,45 @@ sprint.p("NN Instantiated", 2)
 
 sprint.p("Training NN",1)
 
-# create your optimizer
-#for x in net.parameters():
-#    print(x.size())
-
-
-optimizer = optim.SGD(net.parameters(), lr=initial_learning_rate)
+optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 net.train()
-dataset.train_mode()
 criterion = nn.MSELoss()
 
-def train(questions, answers, labels):
+def adjust_learning_rate(epo):
+    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    lr = learning_rate / epo
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+def train(questions, answers):
     optimizer.zero_grad()   # zero the gradient buffers
     output = net(questions, answers)
+
     loss = max(torch.tensor(0.).to(device), (loss_margin - output[0] + output[1:].max()) )
-    #loss = loss_margin + output[1:].max() - output[0]
-    #loss = criterion(labels.float(), output)
-    #loss.backward(retain_graph=True)
+
     loss.backward()
     optimizer.step()    # Does the update
 
-    #for param in net.parameters():
-    #    print(param.grad.data.sum())
-
     return loss.item()
 
-def test(questions, answers, labels):
-    output = net(questions, answers) > output_thres
-    output = output.long()
-
-    accuracy = metrics.accuracy(output, labels)
-    precision = metrics.precision(output, labels)
-    recall = metrics.recall(output, labels)
-
-    # Accuracy, Precision, Recall
-    return ( accuracy, precision, recall )
+def test(questions, answers):
+    return net(questions, answers)
 
 
-#print([x.size() for x in list(net.parameters())])
 starting_time = time()
 sprint.p('Batch size: %d' % batch_size, 2)
-
 sprint.p("Starting",2)
+dataset.train_mode()
+
 for epoch in range(training_epochs):
 
+    # adjust learning rate
+    adjust_learning_rate(epoch+1)
+
     # train
-    sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, train(*dataset.next())), 3)
+    loss = train(*dataset.next())
+
+    sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, loss), 3)
     #sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.test_batch(balanced=True, size=20))), 3)
     # validation
     #sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)
@@ -166,31 +161,17 @@ sprint.p('Training took %.2f seconds' % (time()-starting_time), 2)
 sprint.p("Testing NN", 1)
 
 starting_time = time()
-accu_array = []
-recall_array = []
-prec_array = []
-
+results = []
 round = 1
-test_round = 20
-dataset.test_mode()
 
 sprint.p('Starting', 2)
+dataset.test_mode()
 
-while round < test_round:
-    input = dataset.test_batch(balanced=True, size=100)
-    if input is None:
-        break
-    else:
-        acc, prec, rec = test(*input)
+while round < test_rounds:
+    results.append(test(*dataset.next()))
 
-        accu_array.append(acc)
-        recall_array.append(rec)
-        prec_array.append(prec)
+    sprint.p('Round %d' % round, 3)
+    round += 1
 
-        sprint.p('Round %d' % round, 3)
-        round += 1
-
-
-sprint.p('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % (numpy.mean(accu_array), numpy.mean(prec_array), numpy.mean(recall_array)), 2)
-
+sprint.p('MRR: %2.2f, MAP: %2.2f' % (metrics.MRR(results), metrics.MAP(results)), 2)
 sprint.p('Testing took %.2f seconds' % (time()-starting_time), 2)
