@@ -34,7 +34,7 @@ def RR(output):
     output = output.tolist()
     first = output[0]
     output.sort(reverse=True)
-    index = output.index(max(output))
+    index = output.index(first)
     return 1.0/(index+1)
 
 def MRR(output_array):

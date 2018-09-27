@@ -33,9 +33,9 @@ sprint.p('Loading the Google News Word Embedding model', 1)
 
 starting_time = time()
 if user_red_model:
-    model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+    we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
 else:
-    model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
+    we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
 sprint.p('Loading took %d seconds' % (time()-starting_time), 2)
 
 sprint.p('Done', 2)
@@ -47,7 +47,7 @@ sprint.p('Done', 2)
 
 sprint.p('Initializing Hyperparameters', 1)
 k = 3 # 3, 5, 7
-word_embedding_size = model.syn0.shape[1]
+word_embedding_size = we_model.syn0.shape[1]
 convolutional_filters = 400
 batch_size = 20
 learning_rate = 1.1
@@ -72,7 +72,7 @@ sprint.p('Will train on %s' % (torch.cuda.get_device_name(device.index) if devic
 ################################################################################
 
 sprint.p('Loading datasets', 1)
-dataset = datasets.DatasetManager(dataset_name, batch_size, device, model)
+dataset = datasets.DatasetManager(dataset_name, batch_size, device, we_model)
 
 
 ################################################################################
@@ -112,6 +112,8 @@ optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 net.train()
 criterion = nn.MSELoss()
 
+#print([x for x in net.parameters()])
+
 def adjust_learning_rate(epo):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = learning_rate / epo
@@ -122,7 +124,7 @@ def train(questions, answers):
     optimizer.zero_grad()   # zero the gradient buffers
     output = net(questions, answers)
 
-    loss = max(torch.tensor(0.).to(device), (loss_margin - output[0] + output[1:].max()) )
+    loss = torch.max(torch.tensor(0.).to(device), (loss_margin - output[0] + output[1:].max()) )
 
     loss.backward()
     optimizer.step()    # Does the update
@@ -143,10 +145,7 @@ for epoch in range(training_epochs):
     # adjust learning rate
     adjust_learning_rate(epoch+1)
 
-    # train
-    loss = train(*dataset.next())
-
-    sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, loss), 3)
+    sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, train(*dataset.next())), 3)
     #sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.test_batch(balanced=True, size=20))), 3)
     # validation
     #sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)

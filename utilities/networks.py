@@ -13,37 +13,55 @@ class QA_CNN(nn.Module):
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
 
-        self.conv2 = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+        self.conv = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+        #self.conv = nn.Conv1d(1, self.convolutional_filters, self.embedding_size * self.context_len)
+        #self.W = nn.Parameter(torch.Tensor(self.embedding_size * self.context_len, self.convolutional_filters))
+        #self.b = nn.Parameter(torch.Tensor(self.convolutional_filters))
+
 
     def forward(self, question, answer):
         ## question: bs * M * d
         ## answer: bs * L * d
+        '''
+        assert(question.size()[0] == answer.size()[0])
+        batch_size = question.size()[0]
 
         question = self.sentence_to_Z_vector(question, self.max_len_Q)
         ## bs * M * dk
-
         answer = self.sentence_to_Z_vector(answer, self.max_len_A)
         ## bs * L * dk
 
-        question = question.view(-1, 1, self.max_len_Q, self.embedding_size * self.context_len)
-        ## bs * 1 * M * dk
+        Q = torch.Tensor(batch_size, self.max_len_Q, self.convolutional_filters).to(self.device)
+        A = torch.Tensor(batch_size, self.max_len_A, self.convolutional_filters).to(self.device)
 
-        answer = answer.view(-1, 1, self.max_len_A, self.embedding_size * self.context_len)
-        ## bs * 1 * L * dk
+        for i in range(question.size()[0]):
+            Q[i] = torch.addmm(self.b, question[i], self.W)
+        ## bs * M * c
+        for i in range(answer.size()[0]):
+            A[i] = torch.addmm(self.b, answer[i], self.W)
+        ## bs * L * c
 
-        question.transpose_(2,3)
+        return Q.transpose(1,2), A.transpose(1,2)
+
+        '''
+
+        question = self.sentence_to_Z_vector(question, self.max_len_Q)
+        ## bs * M * dk
+        answer = self.sentence_to_Z_vector(answer, self.max_len_A)
+        ## bs * L * dk
+
+        question = question.unsqueeze(1).transpose(2,3)
+        ## bs * 1 * dk * M
+        answer = answer.unsqueeze(1).transpose(2,3)
         ## bs * 1 * dk * M
 
-        answer.transpose_(2,3)
-        ## bs * 1 * dk * M
-
-        question = self.conv2(question).squeeze()
+        question = self.conv(question).squeeze()
         ## bs * c * M
-
-        answer = self.conv2(answer).squeeze()
+        answer = self.conv(answer).squeeze()
         ## bs * c * M
 
         return question, answer
+
 
     def sentence_to_Z_vector(self, sentences, length):
         tot = []
@@ -72,7 +90,7 @@ class QA_biLSTM(nn.Module):
         self.hidden_dim = hidden_dim
         self.embedding_size = embedding_size
 
-        self.lstm = nn.LSTM(embedding_size, hidden_dim, bidirectional = True)
+        self.lstm = nn.LSTM(embedding_size, hidden_dim, bidirectional=True)
 
         self.hidden = self.init_hidden()
 
@@ -95,8 +113,6 @@ class AttentivePoolingNetwork(nn.Module):
 
         self.device = device
         self.M, self.L = max_len
-
-        ## params of the CNN
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
         self.embedding_size = embedding_size
@@ -111,49 +127,28 @@ class AttentivePoolingNetwork(nn.Module):
             raise ValueError('Mode must be CNN or biLSTM')
 
         self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
-
-        self.tanh = nn.Tanh()
-        self.extract_q_feats = nn.MaxPool1d(self.L)
-        self.extract_a_feats = nn.MaxPool1d(self.M)
-
-        self.softmax = nn.Softmax(dim=1)
-
+        torch.nn.init.normal_(self.U, mean=0, std=1)
         self.sim = nn.CosineSimilarity(dim=1, eps=1e-6)
 
     def forward(self, question, answer):
-        ## get batch_size
-        batch_size = question.size()[0]
-
         ## question: bs * M * d
         ## answer: bs * L * d
 
         Q, A = self.cnn_bilstm(question, answer)
-        ## Q: bs * c * M
-        ## A: bs * c * L
+        ## Q: bs * c * M - A: bs * c * L
 
-        res = torch.Tensor(batch_size, self.M, self.L)
-        for i in range(batch_size):
-            res[i] = Q[i].transpose(0,1).mm(self.U).mm(A[i])
-        #res = torch.mm(Q.view(batch_size * self.M, self.convolutional_filters), self.U).view(batch_size, self.M, self.convolutional_filters).bmm(A)
+        G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
         ## bs * M * L
 
-        G = self.tanh(res)
-        ## bs * M * L
+        roQ = G.max(2)[0].softmax(dim=1)
+        ## bs * M
+        roA = G.max(1)[0].softmax(dim=1)
+        ## bs * L
 
-        max_pool_Q = self.extract_q_feats(G).view(-1, self.M, 1)
-        ## bs * M * 1
-
-        max_pool_A = self.extract_a_feats(G.transpose(1,2)).view(-1, self.L, 1)
-        ## bs * L * 1
-
-        roQ = self.softmax(max_pool_Q)
-        ## bs * M * 1
-        roA = self.softmax(max_pool_A)
-        ## bs * L * 1
-
-        rQ = Q.bmm(roQ).view(-1, self.convolutional_filters)
-        rA = A.bmm(roA).view(-1, self.convolutional_filters)
-        # rA=rQ : bs * c
+        rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
+        ## bs * c
+        rA = A.matmul(roA.unsqueeze(2)).squeeze()
+        ## bs * c
 
         return self.sim(rQ, rA)
         ## bs
