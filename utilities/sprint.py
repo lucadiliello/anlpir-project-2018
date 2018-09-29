@@ -8,6 +8,7 @@ def p(stringa, indent):
         4: 'red',
     }
     stringa = '@@@ ' + '- ' * indent + stringa
+
     if indent == 1:
         stringa = '\n' + stringa
 

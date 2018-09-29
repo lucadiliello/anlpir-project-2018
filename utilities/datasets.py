@@ -4,60 +4,50 @@ import numpy
 import gensim
 from random import shuffle
 from functools import reduce
-from utilities import loader, sprint
+from utilities import sprint
 
 class DatasetManager(object):
 
-    def __init__(self, dataset_name, batch_size, device, word_embedding_model):
+    def __init__(self, datasets, batch_size, device, vocabulary):
         super(DatasetManager, self).__init__()
         self.last_index = 0
         self.batch_size = batch_size
         self.device = device
 
-        self.model = word_embedding_model
-        self.vocab_size, self.word_embedding_size = self.model.syn0.shape
+        self.vocabulary = vocabulary
 
         self.max_question_len = 0
         self.max_answer_len = 0
 
-        self.train, self.valid, self.test = loader.Loader(dataset_name).load()
+        self.train, self.valid, self.test = datasets
 
         ### init to train()
         self.data = self.train
-
 
         ### SHUFFLING DATASET
         shuffle(self.train)
         shuffle(self.valid)
         shuffle(self.test)
 
-
         ### ORGANIZING ANSWERS
-        sprint.p('Organizing answes per label', 1)
-
+        sprint.p('Organizing answers per label', 1)
         self.train = self.organise_answers(self.train)
         self.valid = self.organise_answers(self.valid)
         self.test = self.organise_answers(self.test)
-
         sprint.p('Done', 2)
-
 
         ### REMOVE USELESS ENTRIES
         sprint.p('Removing entries without both labels', 1)
-
         self.train = self.remove_entries_without_both_labels(self.train)
         sprint.p('Train done', 2)
         self.valid = self.remove_entries_without_both_labels(self.valid)
         sprint.p('Validation done', 2)
         self.test = self.remove_entries_without_both_labels(self.test)
         sprint.p('Test done', 2)
-
         sprint.p("After label filtering: %d training elements, %d validation elements and %d test elements" % (len(self.train),len(self.valid),len(self.test)), 2)
-
 
         ### CLEANING AND REMOVING WORDS NOT IN THE GOOGLE MODEL
         sprint.p('Cleaning datasets and removing words not in the google model', 1)
-
         self.train = self.cleaning(self.train)
         sprint.p('Train done', 2)
         self.valid = self.cleaning(self.valid)
@@ -65,25 +55,22 @@ class DatasetManager(object):
         self.test = self.cleaning(self.test)
         sprint.p('Test done', 2)
 
-
         ### SAVING ORIGINAL DATASETS
         self.original_train = self.train
         self.original_valid = self.valid
         self.original_test = self.test
-
 
         ### FIND MAX LENGTH OF QUESTIONS AND ANSWERS
         sprint.p('Finding max Q/A length', 1)
         self.find_max_len()
         sprint.p("Max question length: %d, max answer length: %d" % (self.max_question_len, self.max_answer_len), 2)
 
-
-        ### WORD EMBEDDING AND PADDING
-        self.train = self.WE_and_padding(self.train)
+        ### WORD-2-INDEX AND PADDING
+        self.train = self.WI_and_padding(self.train)
         sprint.p('Train done', 2)
-        self.valid = self.WE_and_padding(self.valid)
+        self.valid = self.WI_and_padding(self.valid)
         sprint.p('Validation done', 2)
-        self.test = self.WE_and_padding(self.test)
+        self.test = self.WI_and_padding(self.test)
         sprint.p('Test done', 2)
 
 
@@ -107,7 +94,7 @@ class DatasetManager(object):
 
 
     def cleaning(self, dataset):
-        clean = lambda a: [word for word in gensim.utils.simple_preprocess(a) if word in self.model.wv.vocab]
+        clean = lambda a: [word for word in gensim.utils.simple_preprocess(a) if word in self.vocabulary]
         res = []
         for entry in dataset:
             tmp = {}
@@ -125,15 +112,14 @@ class DatasetManager(object):
         self.max_answer_len = max(find_max_len_A(self.train), find_max_len_A(self.valid), find_max_len_A(self.test))
 
 
-    def WE_and_padding(self, dataset):
-        padding_embedding = lambda: [0.] * self.word_embedding_size
-        embed = lambda sentence, max_len: [self.model.get_vector(token) for token in sentence] + [padding_embedding()] * (max_len - len(sentence))
+    def WI_and_padding(self, dataset):
+        WI_padding = lambda sentence, max_len: [self.vocabulary[x] for x in sentence] + [0] * (max_len - len(sentence))
         res = []
         for entry in dataset:
             tmp = {}
-            tmp['question'] = embed(entry['question'], self.max_question_len)
-            tmp['candidates_pos'] = [embed(sentence, self.max_answer_len) for sentence in entry['candidates_pos']]
-            tmp['candidates_neg'] = [embed(sentence, self.max_answer_len) for sentence in entry['candidates_neg']]
+            tmp['question'] = WI_padding(entry['question'], self.max_question_len)
+            tmp['candidates_pos'] = [WI_padding(sentence, self.max_answer_len) for sentence in entry['candidates_pos']]
+            tmp['candidates_neg'] = [WI_padding(sentence, self.max_answer_len) for sentence in entry['candidates_neg']]
             res.append(tmp)
         return res
 

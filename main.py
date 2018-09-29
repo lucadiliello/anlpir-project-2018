@@ -7,8 +7,9 @@ import torch.nn as nn
 from torch import optim
 from time import time
 import argparse
-from utilities import networks, metrics, sprint, datasets
+from utilities import networks, metrics, sprint, datasets, loader, custom
 import numpy
+
 
 
 ################################################################################
@@ -19,26 +20,12 @@ parser = argparse.ArgumentParser(description='Create an AP network for Question 
 
 parser.add_argument("-n", help="type of the network, either CNN or biLSTM", type=str, default='CNN', dest='network_type', choices=['CNN','biLSTM'])
 parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=str, default='TrecQA', dest='dataset_name', choices=['TrecQA','WikiQA'])
-parser.add_argument("-r", help="Use reduced GoogleNews WE model", action="store_true", dest="user_red_model")
+parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='Google', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch'])
 args = parser.parse_args()
 network_type = args.network_type
 dataset_name = args.dataset_name
-user_red_model = args.user_red_model
+model_type = args.model_type
 
-################################################################################
-### LOADING WORD EMBEDDINGS GOOGLE-NEWS MODEL
-################################################################################
-
-sprint.p('Loading the Google News Word Embedding model', 1)
-
-starting_time = time()
-if user_red_model:
-    we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
-else:
-    we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
-sprint.p('Loading took %d seconds' % (time()-starting_time), 2)
-
-sprint.p('Done', 2)
 
 
 ################################################################################
@@ -46,14 +33,17 @@ sprint.p('Done', 2)
 ################################################################################
 
 sprint.p('Initializing Hyperparameters', 1)
+
 k = 3 # 3, 5, 7
-word_embedding_size = we_model.syn0.shape[1]
+word_embedding_size = 300
+word_embedding_window = 3
 convolutional_filters = 400
 batch_size = 20
 learning_rate = 1.1
 loss_margin = 0.5
 training_epochs = 25
 test_rounds = 40
+n_threads = 8
 
 def get_device():
     if torch.cuda.is_available():
@@ -67,12 +57,85 @@ device = get_device()
 sprint.p('Will train on %s' % (torch.cuda.get_device_name(device.index) if device.type.startswith('cuda') else device.type), 2)
 
 
+
 ################################################################################
 ### LOADING DATASET
 ################################################################################
 
 sprint.p('Loading datasets', 1)
-dataset = datasets.DatasetManager(dataset_name, batch_size, device, we_model)
+datasets_tupla = loader.Loader(dataset_name).load()
+sprint.p('Datasets loaded', 2)
+
+
+
+################################################################################
+### DOCUMENTS FOR VOCABULARIES
+################################################################################
+
+def get_sentences(ds):
+    for row in ds:
+        yield gensim.utils.simple_preprocess(row['question'])
+        for answer in row['candidates']:
+            yield gensim.utils.simple_preprocess(answer['sentence'])
+
+documents = []
+for ds in datasets_tupla:
+    documents += list(get_sentences(ds))
+
+
+
+################################################################################
+### LOADING WORD EMBEDDINGS MODEL
+################################################################################
+
+sprint.p('Loading the Word Embedding model, you choose %s' % model_type, 1)
+
+starting_time = time()
+if model_type == 'Google':
+    we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
+    word_embedding_size = we_model.wv.syn0.shape[1]
+elif model_type == 'GoogleRed':
+    we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+    word_embedding_size = we_model.wv.syn0.shape[1]
+elif model_type == 'LearnGensim':
+    we_model = custom.word_embedding_model(documents, word_embedding_size, word_embedding_window, n_threads)
+elif model_type == 'LearnPyTorch':
+    we_model = None
+else:
+    print('Wrong WE model argument')
+    exit()
+
+sprint.p('Loading took %d seconds' % (time()-starting_time), 2)
+sprint.p('Done', 2)
+
+
+
+################################################################################
+### CREATING/EXTRACTING VOCABULARY
+################################################################################
+
+def create_vocabulary(docs):
+    vocab = dict()
+    index = 1
+    for sent in docs:
+        for token in sent:
+            if token not in vocab:
+                vocab[token] = index
+                index += 1
+    return vocab
+
+vocabulary = {key: (value.index + 1) for (key, value) in we_model.wv.vocab.items()} if we_model else create_vocabulary(documents)
+
+
+
+################################################################################
+### LOADING DATASET
+################################################################################
+
+sprint.p('Creating batch manager', 1)
+dataset = datasets.DatasetManager(datasets_tupla, batch_size, device, vocabulary)
+sprint.p('Done', 2)
+
 
 
 ################################################################################
@@ -93,14 +156,17 @@ sprint.p("Average answers length", 2)
 sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['average_answer_len'], results['valid']['average_answer_len'], results['test']['average_answer_len']), 3)
 
 
+
 ################################################################################
 ### NEURAL NETWORK
 ################################################################################
 
 sprint.p("Neural network creation",1)
-net = networks.AttentivePoolingNetwork((dataset.max_question_len, dataset.max_answer_len), word_embedding_size, device, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
+net = networks.AttentivePoolingNetwork((dataset.max_question_len, dataset.max_answer_len), (len(vocabulary), word_embedding_size), device, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
 #print(net)
 sprint.p("NN Instantiated", 2)
+
+
 
 ################################################################################
 ### TRAINING NETWORK
@@ -151,6 +217,7 @@ for epoch in range(training_epochs):
     #sprint('Accuracy: %2.2f - Precision: %2.2f - Recall: %2.2f' % test(*valid_ds.next()), 4)
 
 sprint.p('Training took %.2f seconds' % (time()-starting_time), 2)
+
 
 
 ################################################################################

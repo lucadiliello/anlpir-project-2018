@@ -108,14 +108,22 @@ class QA_biLSTM(nn.Module):
 
 class AttentivePoolingNetwork(nn.Module):
 
-    def __init__(self, max_len, embedding_size, device, type_of_nn='CNN', convolutional_filters=400, context_len=3):
+    def __init__(self, max_len, word_embedding_dims, device, word_embedding_model=None, type_of_nn='CNN', convolutional_filters=400, context_len=3):
         super(AttentivePoolingNetwork, self).__init__()
 
         self.device = device
         self.M, self.L = max_len
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
-        self.embedding_size = embedding_size
+        self.vocab_size, self.embedding_size = word_embedding_dims
+
+        if word_embedding_model:
+            weights = torch.tensor(word_embedding_model.wv.syn0)
+            weights = torch.cat((torch.zeros(1,self.embedding_size), weights), dim=0)
+            self.embedding_layer = nn.Embedding(self.vocab_size + 1, self.embedding_size, padding_idx=0).from_pretrained(weights, freeze=True)
+        else:
+            self.embedding_layer = nn.Embedding(self.vocab_size + 1, self.embedding_size, padding_idx=0)
+
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
@@ -128,11 +136,15 @@ class AttentivePoolingNetwork(nn.Module):
 
         self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
         torch.nn.init.normal_(self.U, mean=0, std=1)
-        self.sim = nn.CosineSimilarity(dim=1, eps=1e-6)
 
     def forward(self, question, answer):
-        ## question: bs * M * d
-        ## answer: bs * L * d
+        ## question: bs * M
+        ## answer: bs * L
+
+        question = self.embedding_layer(question)
+        ## bs * M * d
+        answer = self.embedding_layer(answer)
+        ## bs * M * d
 
         Q, A = self.cnn_bilstm(question, answer)
         ## Q: bs * c * M - A: bs * c * L
@@ -150,5 +162,5 @@ class AttentivePoolingNetwork(nn.Module):
         rA = A.matmul(roA.unsqueeze(2)).squeeze()
         ## bs * c
 
-        return self.sim(rQ, rA)
+        return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)
         ## bs
