@@ -87,24 +87,6 @@ class QA_CNN(nn.Module):
     def context2indexes(self, i):
         return zip(range(self.context_len), range(i - int(self.context_len/2), i + int(self.context_len/2) + 1))
 
-def context2indexes(i):
-    return zip(range(3), range(i - int(3/2), i + int(3/2) + 1))
-
-def _sentece2Z(sentence, length):
-    assert(len(sentence) == length)
-    res = torch.zeros(length, 4 * 3)
-    for index in range(len(sentence)):
-        tmp = []
-        for j, i in context2indexes(index):
-            if i >= 0 and i < len(sentence):
-                tmp.append(sentence[i])
-            else:
-                tmp.append(torch.zeros(4))
-        res[index] = torch.cat(tmp)
-    return res
-
-
-
 
 class QA_biLSTM(nn.Module):
 
