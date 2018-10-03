@@ -14,6 +14,8 @@ class QA_CNN(nn.Module):
         self.context_len = context_len
 
         self.conv = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+
+        #self.conv = nn.Conv2d(1, self.convolutional_filters, (self.context_len, self.embedding_size), padding=(1,0))
         #self.conv = nn.Conv1d(1, self.convolutional_filters, self.embedding_size * self.context_len)
         #self.W = nn.Parameter(torch.Tensor(self.embedding_size * self.context_len, self.convolutional_filters))
         #self.b = nn.Parameter(torch.Tensor(self.convolutional_filters))
@@ -26,9 +28,9 @@ class QA_CNN(nn.Module):
         assert(question.size()[0] == answer.size()[0])
         batch_size = question.size()[0]
 
-        question = self.sentence_to_Z_vector(question, self.max_len_Q)
+        question = self.sentences2Z(question, self.max_len_Q)
         ## bs * M * dk
-        answer = self.sentence_to_Z_vector(answer, self.max_len_A)
+        answer = self.sentences2Z(answer, self.max_len_A)
         ## bs * L * dk
 
         Q = torch.Tensor(batch_size, self.max_len_Q, self.convolutional_filters).to(self.device)
@@ -45,9 +47,9 @@ class QA_CNN(nn.Module):
 
         '''
 
-        question = self.sentence_to_Z_vector(question, self.max_len_Q)
+        question = self.sentences2Z(question, self.max_len_Q)
         ## bs * M * dk
-        answer = self.sentence_to_Z_vector(answer, self.max_len_A)
+        answer = self.sentences2Z(answer, self.max_len_A)
         ## bs * L * dk
 
         question = question.unsqueeze(1).transpose(2,3)
@@ -62,21 +64,46 @@ class QA_CNN(nn.Module):
 
         return question, answer
 
-
-    def sentence_to_Z_vector(self, sentences, length):
-        tot = []
+    def sentences2Z(self, sentences, length):
+        res = []
         for sentence in sentences:
-            res = []
-            for index in range(length):
-                tmp = [None] * self.context_len
-                for disc in range(-int(self.context_len/2), int(self.context_len/2) + 1):
-                    tmp[disc + int(self.context_len/2)] = sentence[(index + disc)] if (index + disc) >= 0 and (index + disc) < len(sentence) else self.pad_tensor()
-                res.append(torch.cat(tmp))
-            tot.append(torch.stack(res))
-        return torch.stack(tot)
+            res.append(self._sentece2Z(sentence, length))
+        return torch.stack(res, dim=0).to(self.device)
 
-    def pad_tensor(self):
-        return torch.FloatTensor([.0] * self.embedding_size).to(self.device)
+    def _sentece2Z(self, sentence, length):
+        assert(len(sentence) == length)
+        res = torch.zeros(length, self.embedding_size * self.context_len)
+
+        for index in range(len(sentence)):
+            tmp = []
+            for j, i in self.context2indexes(index):
+                if i >= 0 and i < len(sentence):
+                    tmp.append(sentence[i])
+                else:
+                    tmp.append(torch.zeros(self.embedding_size))
+            res[index] = torch.cat(tmp)
+        return res
+
+    def context2indexes(self, i):
+        return zip(range(self.context_len), range(i - int(self.context_len/2), i + int(self.context_len/2) + 1))
+
+def context2indexes(i):
+    return zip(range(3), range(i - int(3/2), i + int(3/2) + 1))
+
+def _sentece2Z(sentence, length):
+    assert(len(sentence) == length)
+    res = torch.zeros(length, 4 * 3)
+    for index in range(len(sentence)):
+        tmp = []
+        for j, i in context2indexes(index):
+            if i >= 0 and i < len(sentence):
+                tmp.append(sentence[i])
+            else:
+                tmp.append(torch.zeros(4))
+        res[index] = torch.cat(tmp)
+    return res
+
+
 
 
 class QA_biLSTM(nn.Module):
@@ -123,7 +150,6 @@ class AttentivePoolingNetwork(nn.Module):
             self.embedding_layer = nn.Embedding(self.vocab_size + 1, self.embedding_size, padding_idx=0).from_pretrained(weights, freeze=True)
         else:
             self.embedding_layer = nn.Embedding(self.vocab_size + 1, self.embedding_size, padding_idx=0)
-
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':

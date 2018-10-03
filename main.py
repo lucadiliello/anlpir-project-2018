@@ -34,15 +34,15 @@ model_type = args.model_type
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 3 # 3, 5, 7
+k = 4 # 3, 5, 7
 word_embedding_size = 300
-word_embedding_window = 3
+word_embedding_window = 4
 convolutional_filters = 400
 batch_size = 20
 learning_rate = 1.1
 loss_margin = 0.5
 training_epochs = 25
-test_rounds = 40
+test_rounds = 50
 n_threads = 8
 
 def get_device():
@@ -69,7 +69,7 @@ sprint.p('Datasets loaded', 2)
 
 
 ################################################################################
-### DOCUMENTS FOR VOCABULARIES
+### DOCUMENTS FOR VOCABULARY CREATION
 ################################################################################
 
 def get_sentences(ds):
@@ -88,7 +88,7 @@ for ds in datasets_tupla:
 ### LOADING WORD EMBEDDINGS MODEL
 ################################################################################
 
-sprint.p('Loading the Word Embedding model, you choose %s' % model_type, 1)
+sprint.p('Loading the Word Embedding model, you choosed %s' % model_type, 1)
 
 starting_time = time()
 if model_type == 'Google':
@@ -136,7 +136,19 @@ sprint.p('Creating batch manager', 1)
 dataset = datasets.DatasetManager(datasets_tupla, batch_size, device, vocabulary)
 sprint.p('Done', 2)
 
+'''
+vocabulary = {value:key for (key, value) in vocabulary.items()}
+vocabulary[0] = None
+dataset.train_mode()
+bs = dataset.next(3)
+question, answer = bs
+for q in question:
+    print(' '.join([vocabulary[x] for x in q.data.tolist() if x]))
 
+for a in answer:
+    print(' '.join([vocabulary[x] for x in a.data.tolist() if x]))
+exit()
+'''
 
 ################################################################################
 ### STATISTICS ON THE DATASET
@@ -174,11 +186,11 @@ sprint.p("NN Instantiated", 2)
 
 sprint.p("Training NN",1)
 
-optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 net.train()
+optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 criterion = nn.MSELoss()
 
-#print([x for x in net.parameters()])
+print([x.size() for x in net.parameters()])
 
 def adjust_learning_rate(epo):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
@@ -190,10 +202,13 @@ def train(questions, answers):
     optimizer.zero_grad()   # zero the gradient buffers
     output = net(questions, answers)
 
-    loss = torch.max(torch.tensor(0.).to(device), (loss_margin - output[0] + output[1:].max()) )
+    ## loss_margin - best + bad
+    loss = torch.max(torch.tensor(0.).to(device), torch.tensor([loss_margin]).float().sub(output[0]).add(output[1:].max()) )
 
     loss.backward()
     optimizer.step()    # Does the update
+
+    #print([x.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
 
     return loss.item()
 

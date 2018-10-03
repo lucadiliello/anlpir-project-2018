@@ -25,9 +25,9 @@ class DatasetManager(object):
         self.data = self.train
 
         ### SHUFFLING DATASET
-        shuffle(self.train)
-        shuffle(self.valid)
-        shuffle(self.test)
+        #shuffle(self.train)
+        #shuffle(self.valid)
+        #shuffle(self.test)
 
         ### ORGANIZING ANSWERS
         sprint.p('Organizing answers per label', 1)
@@ -79,8 +79,8 @@ class DatasetManager(object):
         for entry in dataset:
             tmp = {}
             tmp['question'] = entry['question']
-            tmp['candidates_pos'] = [cand['sentence'] for cand in entry['candidates'] if cand['label'] == 1]
-            tmp['candidates_neg'] = [cand['sentence'] for cand in entry['candidates'] if cand['label'] == 0]
+            tmp['candidates_pos'] = [cand['sentence'] for cand in entry['candidates'] if cand['label']]
+            tmp['candidates_neg'] = [cand['sentence'] for cand in entry['candidates'] if not cand['label']]
             res.append(tmp)
         return res
 
@@ -167,16 +167,17 @@ class DatasetManager(object):
     def reset_index(self):
         self.last_index = 0
 
-    def question_to_batch(self, index):
+    def question_to_batch(self, index, bs):
+        dimension = bs
         ## First tuple is (q,a+), other tuples are (q,a-)
         entry = self.data[index]
-        risposte = [random.choice(entry['candidates_pos'])] + (random.sample(entry['candidates_neg'], self.batch_size) if len(entry['candidates_neg']) > self.batch_size else entry['candidates_neg'])
+        risposte = [random.choice(entry['candidates_pos'])] + (random.sample(entry['candidates_neg'], dimension) if len(entry['candidates_neg']) > dimension else entry['candidates_neg'])
         domande = [entry['question']] * len(risposte)
-        return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device)#, torch.tensor([1] + [0] * (len(risposte)-1)).to(self.device)
+        return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device)
 
-    def next(self):
+    def next(self, batch_size=None):
         index = random.randint(0, len(self.data) - 1)
-        return self.question_to_batch(index)
+        return self.question_to_batch(index, batch_size or self.batch_size)
 
     def ordered_next(self):
         if self.last_index >= len(self.data):
