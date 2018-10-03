@@ -154,20 +154,20 @@ class AttentivePoolingNetwork(nn.Module):
         answer = self.embedding_layer(answer)
         ## bs * M * d
 
+        print(question[0,:5,:5])
+        print(answer[0,:5,:5])
+        exit()
         Q, A = self.cnn_bilstm(question, answer)
         ## Q: bs * c * M - A: bs * c * L
 
-        G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
-        ## bs * M * L
 
-        roQ = G.max(2)[0].softmax(dim=1)
-        ## bs * M
-        roA = G.max(1)[0].softmax(dim=1)
-        ## bs * L
-
-        rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
+        rQ = Q.max(2)[0]
+        #print(rQ[:5,:5])
+        rQ = rQ.tanh()
+        #print(rQ[:5,:5])
+        exit()
         ## bs * c
-        rA = A.matmul(roA.unsqueeze(2)).squeeze()
+        rA = A.max(2)[0].tanh()
         ## bs * c
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)

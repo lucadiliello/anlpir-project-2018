@@ -136,9 +136,11 @@ sprint.p('Creating batch manager', 1)
 dataset = datasets.DatasetManager(datasets_tupla, batch_size, device, vocabulary)
 sprint.p('Done', 2)
 
-'''
+
 vocabulary = {value:key for (key, value) in vocabulary.items()}
 vocabulary[0] = None
+
+
 dataset.train_mode()
 bs = dataset.next(3)
 question, answer = bs
@@ -148,7 +150,7 @@ for q in question:
 for a in answer:
     print(' '.join([vocabulary[x] for x in a.data.tolist() if x]))
 exit()
-'''
+
 
 ################################################################################
 ### STATISTICS ON THE DATASET
@@ -208,7 +210,8 @@ def train(questions, answers):
     loss.backward()
     optimizer.step()    # Does the update
 
-    #print([x.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
+    print([x.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
+    print([x.grad.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
 
     return loss.item()
 
