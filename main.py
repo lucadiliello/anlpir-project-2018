@@ -40,8 +40,8 @@ word_embedding_window = 4
 convolutional_filters = 400
 batch_size = 20
 learning_rate = 1.1
-loss_margin = 0.5
-training_epochs = 25
+loss_margin = 0.8
+training_epochs = 2500
 test_rounds = 50
 n_threads = 8
 
@@ -199,7 +199,7 @@ sprint.p("NN Instantiated", 2)
 sprint.p("Training NN",1)
 
 net.train()
-optimizer = optim.SGD(net.parameters(), lr=learning_rate)
+optimizer = optim.Adam(net.parameters(), lr=0.1)
 #criterion = nn.MSELoss()
 
 #print([x.size() for x in net.parameters()])
@@ -236,7 +236,7 @@ dataset.train_mode()
 for epoch in range(training_epochs):
 
     # adjust learning rate
-    adjust_learning_rate(epoch+1)
+    # adjust_learning_rate(epoch+1)
 
     sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, train(*dataset.next())), 3)
     #sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.test_batch(balanced=True, size=20))), 3)
