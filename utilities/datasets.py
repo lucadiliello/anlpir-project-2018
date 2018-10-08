@@ -47,7 +47,7 @@ class DatasetManager(object):
         sprint.p("After label filtering: %d training elements, %d validation elements and %d test elements" % (len(self.train),len(self.valid),len(self.test)), 2)
 
         ### CLEANING AND REMOVING WORDS NOT IN THE GOOGLE MODEL
-        sprint.p('Cleaning datasets and removing words not in the google model', 1)
+        sprint.p('Cleaning datasets and removing words not in the word embedding model', 1)
         self.train = self.cleaning(self.train)
         sprint.p('Train done', 2)
         self.valid = self.cleaning(self.valid)
