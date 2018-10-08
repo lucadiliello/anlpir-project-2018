@@ -1,0 +1,2 @@
+- Batch generation - OK
+- Embedding with 4 models - OK

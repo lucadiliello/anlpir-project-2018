@@ -41,7 +41,7 @@ convolutional_filters = 400
 batch_size = 20
 learning_rate = 1.1
 loss_margin = 0.5
-training_epochs = 25
+training_epochs = 2500
 test_rounds = 50
 n_threads = 8
 
@@ -88,7 +88,7 @@ for ds in datasets_tupla:
 ### LOADING WORD EMBEDDINGS MODEL
 ################################################################################
 
-sprint.p('Loading the Word Embedding model, you choosed %s' % model_type, 1)
+sprint.p('Loading the Word Embedding model, you chose %s' % model_type, 1)
 
 starting_time = time()
 if model_type == 'Google':
@@ -137,20 +137,33 @@ dataset = datasets.DatasetManager(datasets_tupla, batch_size, device, vocabulary
 sprint.p('Done', 2)
 
 
+
+################################################################################
+### TESTING PART - TO BE COMMENTED/DELETED IN FINAL RELEASE
+################################################################################
+'''
 vocabulary = {value:key for (key, value) in vocabulary.items()}
 vocabulary[0] = None
 
 
 dataset.train_mode()
+
+def get_original(voc, sentence):
+    return ([voc[x] for x in sentence.data.tolist() if x])
+
 bs = dataset.next(3)
-question, answer = bs
-for q in question:
-    print(' '.join([vocabulary[x] for x in q.data.tolist() if x]))
+question = bs[0][0]
 
-for a in answer:
-    print(' '.join([vocabulary[x] for x in a.data.tolist() if x]))
+original = get_original(vocabulary,question)
+print(original)
+print(question)
+
+net = networks.AttentivePoolingNetwork((dataset.max_question_len, dataset.max_answer_len), (len(vocabulary), word_embedding_size), device, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
+print(net.embedding_layer(question))
+for word in original:
+    print(we_model.wv[word])
 exit()
-
+'''
 
 ################################################################################
 ### STATISTICS ON THE DATASET
@@ -189,10 +202,10 @@ sprint.p("NN Instantiated", 2)
 sprint.p("Training NN",1)
 
 net.train()
-optimizer = optim.SGD(net.parameters(), lr=learning_rate)
-criterion = nn.MSELoss()
+optimizer = optim.Adam(net.parameters(), lr=0.1)
+#criterion = nn.MSELoss()
 
-print([x.size() for x in net.parameters()])
+#print([x.size() for x in net.parameters()])
 
 def adjust_learning_rate(epo):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
@@ -227,7 +240,7 @@ dataset.train_mode()
 for epoch in range(training_epochs):
 
     # adjust learning rate
-    adjust_learning_rate(epoch+1)
+    # adjust_learning_rate(epoch+1)
 
     sprint.p("Epoch %d, loss: %2.3f" % (epoch+1, train(*dataset.next())), 3)
     #sprint("Epoch %d, loss: %2.3f" % (epoch+1, train(*train_ds.test_batch(balanced=True, size=20))), 3)

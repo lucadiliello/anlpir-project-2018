@@ -13,10 +13,11 @@ class QA_CNN(nn.Module):
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
 
-        self.conv = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+        #self.conv = nn.Conv2d(1, self.convolutional_filters, (self.embedding_size * self.context_len, 1))
+
 
         #self.conv = nn.Conv2d(1, self.convolutional_filters, (self.context_len, self.embedding_size), padding=(1,0))
-        #self.conv = nn.Conv1d(1, self.convolutional_filters, self.embedding_size * self.context_len)
+        self.conv = nn.Conv1d(self.embedding_size, self.convolutional_filters, self.context_len)
         #self.W = nn.Parameter(torch.Tensor(self.embedding_size * self.context_len, self.convolutional_filters))
         #self.b = nn.Parameter(torch.Tensor(self.convolutional_filters))
 
@@ -47,19 +48,19 @@ class QA_CNN(nn.Module):
 
         '''
 
-        question = self.sentences2Z(question, self.max_len_Q)
+        #question = self.sentences2Z(question, self.max_len_Q)
         ## bs * M * dk
-        answer = self.sentences2Z(answer, self.max_len_A)
+        #answer = self.sentences2Z(answer, self.max_len_A)
         ## bs * L * dk
 
-        question = question.unsqueeze(1).transpose(2,3)
+        #question = question.unsqueeze(1).transpose(2,3)
         ## bs * 1 * dk * M
-        answer = answer.unsqueeze(1).transpose(2,3)
+        #answer = answer.unsqueeze(1).transpose(2,3)
         ## bs * 1 * dk * M
 
-        question = self.conv(question).squeeze()
+        question = self.conv(question.transpose(1, 2))
         ## bs * c * M
-        answer = self.conv(answer).squeeze()
+        answer = self.conv(answer.transpose(1, 2))
         ## bs * c * M
 
         return question, answer
