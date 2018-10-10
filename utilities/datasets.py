@@ -10,9 +10,11 @@ class DatasetManager(object):
 
     def __init__(self, datasets, batch_size, device, vocabulary):
         super(DatasetManager, self).__init__()
+
+        self.device = device
+
         self.last_index = 0
         self.batch_size = batch_size
-        self.device = device
 
         self.vocabulary = vocabulary
 
@@ -20,14 +22,6 @@ class DatasetManager(object):
         self.max_answer_len = 0
 
         self.train, self.valid, self.test = datasets
-
-        ### init to train()
-        self.data = self.train
-
-        ### SHUFFLING DATASET
-        #shuffle(self.train)
-        #shuffle(self.valid)
-        #shuffle(self.test)
 
         ### ORGANIZING ANSWERS
         sprint.p('Organizing answers per label', 1)
@@ -151,38 +145,38 @@ class DatasetManager(object):
         return results
 
 
-    def train_mode(self):
-        self.reset_index()
-        self.data = self.train
-
-    def validation_mode(self):
-        self.reset_index()
-        self.data = self.valid
-
-    def test_mode(self):
-        self.reset_index()
-        self.data = self.test
-
-
-    def reset_index(self):
-        self.last_index = 0
-
-    def question_to_batch(self, index, bs):
-        dimension = bs
+    def next_train(self, batch_size=None):
+        index = random.randint(0, len(self.train) - 1)
+        dimension = batch_size or self.batch_size
+        '''
         ## First tuple is (q,a+), other tuples are (q,a-)
         entry = self.data[index]
+        risposte = torch.tensor([random.choice(entry['candidates_pos']), random.choice(entry['candidates_neg'])])
+        domande = torch.tensor([entry['question'], entry['question']])
+        return (domande, risposte)
+        '''
+        entry = self.train[index]
         risposte = [random.choice(entry['candidates_pos'])] + (random.sample(entry['candidates_neg'], dimension) if len(entry['candidates_neg']) > dimension else entry['candidates_neg'])
         domande = [entry['question']] * len(risposte)
-        return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device)
+        # question, answers, targets
+        return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device), torch.tensor([1.] + [0.] * (len(risposte)-1), requires_grad=False).to(self.device)
 
-    def next(self, batch_size=None):
-        index = random.randint(0, len(self.data) - 1)
-        return self.question_to_batch(index, batch_size or self.batch_size)
 
-    def ordered_next(self):
-        if self.last_index >= len(self.data):
-            self.reset_index()
-            return None
-        res = self.question_to_batch(self.last_index)
-        self.last_index += 1
-        return res
+    def next_valid(self):
+        index = random.randint(0, len(self.valid) - 1)
+        entry = self.valid[index]
+
+        risposte = entry['candidates_pos'] + entry['candidates_neg']
+        domande = [entry['question']] * len(risposte)
+        # question, answers, targets
+        return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device), torch.tensor([1.] * len(entry['candidates_pos']) + [0.] * len(entry['candidates_neg']), requires_grad=False).to(self.device)
+
+
+    def next_test(self):
+        index = random.randint(0, len(self.test) - 1)
+        entry = self.test[index]
+
+        risposte = entry['candidates_pos'] + entry['candidates_neg']
+        domande = [entry['question']] * len(risposte)
+        # question, answers, targets
+        return torch.tensor(domande, requires_grad=False).to(self.device), torch.tensor(risposte, requires_grad=False).to(self.device), torch.tensor([1.] * len(entry['candidates_pos']) + [0.] * len(entry['candidates_neg']), requires_grad=False).to(self.device)
