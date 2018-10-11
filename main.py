@@ -36,7 +36,7 @@ convolutional_filters = 4000
 batch_size = 20
 learning_rate = 0.05
 loss_margin = 0.009
-training_epochs = 500
+training_epochs = 1000
 test_rounds = 100
 
 
@@ -117,6 +117,16 @@ net = networks.AttentivePoolingNetwork((len(vocabulary), word_embedding_size), w
 #print(net)
 sprint.p("NN Instantiated", 2)
 
+def weights_initializer(m):
+    if m.data:
+        torch.nn.init.normal_(m.data, mean=0, std=0.1)
+    elif:
+        if m.weight:
+            torch.nn.init.normal_(m.weight, mean=0, std=0.1)
+        if m.bias:
+            torch.nn.init.uniform_(m.bias, a=0, b=0.1)
+
+net.apply(weights_initializer)
 
 ################################################################################
 ### TRAINING NETWORK
@@ -131,7 +141,7 @@ optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 sprint.p('Batch size: %d' % batch_size, 2)
 sprint.p("Starting",2)
 
-criterion = losses.APLoss(loss_margin)
+criterion = losses.ObjectiveHingeLoss(loss_margin)
 
 for epoch in range(training_epochs):
     optimizer.zero_grad()   # zero the gradient buffers

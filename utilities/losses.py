@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-class APLoss(nn.Module):
+class ObjectiveHingeLoss(nn.Module):
     def __init__(self, loss_margin):
-        super(APLoss, self).__init__()
+        super(ObjectiveHingeLoss, self).__init__()
         self.loss_margin = loss_margin
         self.relu = nn.ReLU()
 

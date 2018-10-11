@@ -12,7 +12,6 @@ def AP(output, target):
             total += target[:index].sum().item() / index
     return total/target.sum().item()
 
-
 def MAP(outputs, targets):
     assert(len(outputs) == len(targets))
     res = []
