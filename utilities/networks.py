@@ -36,21 +36,17 @@ class CNN(nn.Module):
 
         self.conv = nn.Conv1d(self.embedding_size, self.convolutional_filters, self.context_len, padding=1)
 
-    def forward(self, question, answer):
+    def forward(self, sentence):
         ## question: bs * M * d
         ## answer: bs * L * d
 
-        question = question.transpose(1, 2)
-        ## bs * d * M
-        answer = answer.transpose(1, 2)
-        ## bs * d * L
+        sentence = sentence.transpose(1, 2)
+        ## bs * d * M/L
 
-        question = self.conv(question)
-        ## bs * c * M
-        answer = self.conv(answer)
-        ## bs * c * L
+        sentence = self.conv(sentence)
+        ## bs * c * M/L
 
-        return (question, answer)
+        return sentence
 
 
 class biLSTM(nn.Module):
@@ -90,7 +86,7 @@ class AttentivePoolingNetwork(nn.Module):
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
 
-        self.embedding_layer = WordEmbeddingModule(word_embedding_dims, word_embedding_model)
+        self.embedding_layer = WordEmbeddingModule(vocab_size, embedding_size, word_embedding_model)
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
@@ -105,6 +101,8 @@ class AttentivePoolingNetwork(nn.Module):
         self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
         torch.nn.init.normal_(self.U, mean=0, std=0.1)
 
+        self.softmax = nn.Softmax(dim=1)
+
     def forward(self, question, answer):
         ## question: bs * M
         ## answer: bs * L
@@ -114,15 +112,22 @@ class AttentivePoolingNetwork(nn.Module):
         answer = self.embedding_layer(answer)
         ## bs * M * d
 
-        Q, A = self.cnn_bilstm(question, answer)
-        ## Q: bs * c * M - A: bs * c * L
+        Q = self.cnn_bilstm(question)
+        ## bs * c * M
+        A = self.cnn_bilstm(answer)
+        ## bs * c * L
 
         G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
         ## bs * M * L
 
-        roQ = torch.max(G, dim=2)[0].softmax(dim=1)
+        roQ = torch.max(G, dim=2)[0]
         ## bs * M
-        roA = torch.max(G, dim=1)[0].softmax(dim=1)
+        roA = torch.max(G, dim=1)[0]
+        ## bs * L
+
+        roQ = self.softmax(roQ)
+        ## bs * M
+        roA = self.softmax(roA)
         ## bs * L
 
         rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
@@ -157,8 +162,10 @@ class ClassicQANetwork(nn.Module):
         answer = self.embedding_layer(answer)
         ## bs * M * d
 
-        Q, A = self.cnn(question, answer)
-        ## Q: bs * c * M - A: bs * c * L
+        Q = self.cnn(question)
+        ## bs * c * M
+        A = self.cnn(answer)
+        ## bs * c * L
 
         rQ = torch.max(Q, dim=2)[0]
         ## bs * c

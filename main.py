@@ -9,6 +9,7 @@ from time import time
 import argparse
 from utilities import networks, metrics, sprint, datasets, loader, custom, losses
 import numpy
+from prettytable import PrettyTable
 
 
 
@@ -39,23 +40,16 @@ word_embedding_size = 300
 word_embedding_window = 5
 convolutional_filters = 400
 batch_size = 20
-learning_rate = 0.05
+negative_answer_count_training = 20
+learning_rate = 0.01
 loss_margin = 0.5
-training_epochs = 1000
-test_rounds = 200
-n_threads = 8
+training_epochs = 400
+test_rounds = 300
 
-def get_device():
-    if torch.cuda.is_available():
-        for i in range(torch.cuda.device_count()):
-            if torch.cuda.get_device_capability(i) >= (3,5):
-                return torch.device('cuda:%d' % i)
-    return torch.device('cpu:0')
+device = torch.device('cpu')
+#device = torch.device('cuda') # Uncomment this to run on GPU
 
-device = get_device()
-
-#device = torch.device('cpu:0')
-sprint.p('Will train on %s' % (torch.cuda.get_device_name(device.index) if device.type.startswith('cuda') else device.type), 2)
+sprint.p('Will train on %s' % (torch.cuda.get_device_name(device) if device.type == 'cuda' else device.type), 2)
 
 
 
@@ -64,24 +58,9 @@ sprint.p('Will train on %s' % (torch.cuda.get_device_name(device.index) if devic
 ################################################################################
 
 sprint.p('Loading datasets', 1)
-datasets_tupla = loader.Loader(dataset_name).load()
+loader = loader.Loader(dataset_name)
+training_set, validation_set, test_set = loader.load()
 sprint.p('Datasets loaded', 2)
-
-
-
-################################################################################
-### DOCUMENTS FOR VOCABULARY CREATION
-################################################################################
-
-def get_sentences(ds):
-    for row in ds:
-        yield gensim.utils.simple_preprocess(row['question'])
-        for answer in row['candidates']:
-            yield gensim.utils.simple_preprocess(answer['sentence'])
-
-documents = []
-for ds in datasets_tupla:
-    documents += list(get_sentences(ds))
 
 
 
@@ -115,17 +94,7 @@ sprint.p('Done', 2)
 ### CREATING/EXTRACTING VOCABULARY
 ################################################################################
 
-def create_vocabulary(docs):
-    vocab = dict()
-    index = 1
-    for sent in docs:
-        for token in sent:
-            if token not in vocab:
-                vocab[token] = index
-                index += 1
-    return vocab
-
-vocabulary = {key: (value.index + 1) for (key, value) in we_model.wv.vocab.items()} if we_model else create_vocabulary(documents)
+vocabulary = {key: (value.index + 1) for (key, value) in we_model.wv.vocab.items()} if we_model else loader.get_vocabulary()
 
 
 
@@ -134,51 +103,26 @@ vocabulary = {key: (value.index + 1) for (key, value) in we_model.wv.vocab.items
 ################################################################################
 
 sprint.p('Creating batch manager', 1)
-dataset = datasets.DatasetManager(datasets_tupla, batch_size, device, vocabulary)
+sprint.p('Train', 2)
+training_dataset = datasets.DatasetManager(training_set, vocabulary, device, hard_negative_training=True, negative_answer_count=negative_answer_count_training)
+sprint.p('Valid', 2)
+validation_dataset = datasets.DatasetManager(validation_set, vocabulary, device)
+sprint.p('Test', 2)
+test_dataset = datasets.DatasetManager(test_set, vocabulary, device)
 sprint.p('Done', 2)
 
 
-################################################################################
-### TESTING PART - TO BE COMMENTED/DELETED IN FINAL RELEASE
-################################################################################
-'''
-vocabulary = {value:key for (key, value) in vocabulary.items()}
-vocabulary[0] = None
-dataset.train_mode()
-
-def get_original(voc, sentence):
-    return ([voc[x] for x in sentence.data.tolist() if x])
-
-bs = dataset.next(3)
-question = bs[0][0]
-
-original = get_original(vocabulary,question)
-print(original)
-print(question)
-
-net = networks.AttentivePoolingNetwork((dataset.max_question_len, dataset.max_answer_len), (len(vocabulary), word_embedding_size), device, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
-print(net.embedding_layer(question))
-for word in original:
-    print(we_model.wv[word])
-exit()
-'''
 
 ################################################################################
 ### STATISTICS ON THE DATASET
 ################################################################################
 
 sprint.p("Statistics on the 3 datasets", 1)
-
-results = dataset.get_statistics()
-
-sprint.p("Average number of positive answers", 2)
-sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['average_number_pos_answers'], results['valid']['average_number_pos_answers'], results['test']['average_number_pos_answers']), 3)
-sprint.p("Average number of negative answers", 2)
-sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['average_number_neg_answers'], results['valid']['average_number_neg_answers'], results['test']['average_number_neg_answers']), 3)
-sprint.p("Average questions length", 2)
-sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['average_question_len'], results['valid']['average_question_len'], results['test']['average_question_len']), 3)
-sprint.p("Average answers length", 2)
-sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['average_answer_len'], results['valid']['average_answer_len'], results['test']['average_answer_len']), 3)
+t = PrettyTable(['Dataset', 'AVG # pos answers', 'AVG # neg answers', 'AVG question len', 'AVG answer len'])
+t.add_row(['TRAIN'] + ['%2.2f' % x for x in training_dataset.get_statistics()])
+t.add_row(['VALIDATION'] + ['%2.2f' % x for x in validation_dataset.get_statistics()])
+t.add_row(['TEST'] + ['%2.2f' % x for x in test_dataset.get_statistics()])
+print(t)
 
 
 
@@ -187,10 +131,9 @@ sprint.p("TRAIN: %2.2f - VALIDATION: %2.2f - TEST %2.2f" % (results['train']['av
 ################################################################################
 
 sprint.p("Neural network creation",1)
-#net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
-net = networks.ClassicQANetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, convolutional_filters=convolutional_filters, context_len=3).to(device)
+net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
+#net = networks.ClassicQANetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, convolutional_filters=convolutional_filters, context_len=3).to(device)
 
-#print(net)
 sprint.p("NN Instantiated", 2)
 
 
@@ -202,7 +145,7 @@ sprint.p("NN Instantiated", 2)
 sprint.p("Training NN",1)
 
 net.train()
-optimizer = optim.Adam(net.parameters(), lr=0.1)
+optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 criterion = losses.ObjectiveHingeLoss(loss_margin)
 
 def adjust_learning_rate(epo):
@@ -219,12 +162,13 @@ starting_time = time()
 for epoch in range(training_epochs):
     optimizer.zero_grad()   # zero the gradient buffers
 
-    loss = torch.zeros(1).to(device)
+    loss = []
     for _ in range(batch_size):
-        questions, answers, targets = dataset.next_train()
+        questions, answers, targets = training_dataset.next()
         outputs = net(questions, answers)
-        loss += criterion(outputs, targets)
+        loss.append(criterion(outputs, targets))
 
+    loss = sum(loss)
     loss.backward()
     optimizer.step()    # Does the update
 
@@ -242,7 +186,6 @@ sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 ################################################################################
 
 sprint.p("Testing NN", 1)
-
 starting_time = time()
 
 res_outputs = []
@@ -251,7 +194,7 @@ res_targets = []
 sprint.p('Starting', 2)
 
 for round in range(test_rounds):
-    questions, answers, targets = dataset.next_test()
+    questions, answers, targets = test_dataset.next()
     outputs = net(questions, answers)
 
     res_outputs.append(outputs)
