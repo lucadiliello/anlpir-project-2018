@@ -88,7 +88,7 @@ class Loader:
         elif self.pkg_name == 'WikiQA':
 
             import csv
-            valid_tmp = {}
+            valid = {}
             with open('data/WikiQA/WikiQA-dev.tsv', 'r') as csvfile:
                 spamreader = csv.reader(csvfile, delimiter='\t', quotechar='"')
                 next(spamreader, None)  # skip the headers
@@ -99,14 +99,14 @@ class Loader:
                     res['label'] = int(row[6])
                     row[1] = str(row[1])
 
-                    if row[1] in valid_tmp:
-                        valid_tmp[row[1]].append(res)
+                    if row[1] in valid:
+                        valid[row[1]].append(res)
                     else:
-                        valid_tmp[row[1]] = [res]
+                        valid[row[1]] = [res]
 
-            valid = [ {'question': key, 'candidates': value} for key, value in valid_tmp.items()]
+            valid = [ {'question': key, 'candidates': value} for key, value in valid.items()]
 
-            train_tmp = {}
+            train = {}
             with open('data/WikiQA/WikiQA-train.tsv', 'r') as csvfile:
                 spamreader = csv.reader(csvfile, delimiter='\t', quotechar='"')
                 next(spamreader, None)  # skip the headers
@@ -118,14 +118,14 @@ class Loader:
 
                     row[1] = str(row[1])
 
-                    if row[1] in train_tmp:
-                        train_tmp[row[1]].append(res)
+                    if row[1] in train:
+                        train[row[1]].append(res)
                     else:
-                        tratrain_tmpin[row[1]] = [res]
+                        train[row[1]] = [res]
 
-            train = [ {'question': key, 'candidates': value} for key, value in train_tmp.items()]
+            train = [ {'question': key, 'candidates': value} for key, value in train.items()]
 
-            test_tmp = {}
+            test = {}
             with open('data/WikiQA/WikiQA-test.tsv', 'r') as csvfile:
                 spamreader = csv.reader(csvfile, delimiter='\t', quotechar='"')
                 next(spamreader, None)  # skip the headers
@@ -137,12 +137,12 @@ class Loader:
 
                     row[1] = str(row[1])
 
-                    if row[1] in test_tmp:
-                        test_tmp[row[1]].append(res)
+                    if row[1] in test:
+                        test[row[1]].append(res)
                     else:
-                        test_tmp[row[1]] = [res]
+                        test[row[1]] = [res]
 
-            test = [ {'question': key, 'candidates': value} for key, value in test_tmp.items()]
+            test = [ {'question': key, 'candidates': value} for key, value in test.items()]
 
         else:
             raise ValueError('dataset type should be one between InsuranceQA, TrecQA or WikiQA')

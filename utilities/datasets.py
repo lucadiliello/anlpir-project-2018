@@ -20,7 +20,7 @@ class DatasetManager(object):
 
         ### REMOVE USELESS ENTRIES
         sprint.p('Removing entries without both positive and negative answers', 3)
-        self.remove_entries_without_both_labels()
+        self.remove_entries_without_a_labels()
 
         ### CLEANING AND REMOVING WORDS NOT IN THE GOOGLE MODEL
         sprint.p('Cleaning', 3)
@@ -29,6 +29,7 @@ class DatasetManager(object):
         ### FIND MAX QUESTIONS AND ANSWER LENGTH
         sprint.p('Finding max lengths', 3)
         self.set_max_len()
+
 
         ### WORD-2-INDEX AND PADDING
         sprint.p('Word2index and padding', 3)
@@ -42,6 +43,7 @@ class DatasetManager(object):
         self.max_question_len = max(list(map(lambda e: len(e['question']), self.data)))
         self.max_answer_len = max( list( map(lambda e: max( max(list(map(lambda x: len(x), e['candidates_pos']))),  max(list(map(lambda x: len(x), e['candidates_neg']))) ), self.data) ) )
 
+        
     def next(self):
         index = random.randint(0, self.__len__() - 1)
         entry = self.data[index]
@@ -60,10 +62,12 @@ class DatasetManager(object):
             return (torch.tensor(domande, requires_grad=False, device=self.device), torch.tensor(risposte, requires_grad=False, device=self.device), torch.tensor(target, requires_grad=False, device=self.device))
 
 
-    def remove_entries_without_both_labels(self):
+    def remove_entries_without_a_labels(self):
+        res = []
         for entry in self.data:
-            if len(entry['candidates_pos']) == 0 or len(entry['candidates_neg']) == 0:
-                self.data.remove(entry)
+            if (len(entry['candidates_pos']) > 0) and (len(entry['candidates_neg']) > 0):
+                res.append(entry)
+        self.data = res
 
     def cleaning(self):
         clean = lambda a: [word for word in a if word in self.word2index]

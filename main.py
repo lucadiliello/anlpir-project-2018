@@ -35,19 +35,19 @@ model_type = args.model_type
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 3 # 3, 5, 7
+k = 2 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 400
+convolutional_filters = 4000
 batch_size = 20
 negative_answer_count_training = 20
-learning_rate = 0.01
-loss_margin = 0.5
-training_epochs = 400
+learning_rate = 0.05
+loss_margin = 0.009
+training_epochs = 1000
 test_rounds = 300
 
-device = torch.device('cpu')
-#device = torch.device('cuda') # Uncomment this to run on GPU
+#device = torch.device('cpu')
+device = torch.device('cuda') # Uncomment this to run on GPU
 
 sprint.p('Will train on %s' % (torch.cuda.get_device_name(device) if device.type == 'cuda' else device.type), 2)
 
