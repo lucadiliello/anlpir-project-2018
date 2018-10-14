@@ -37,15 +37,15 @@ use_cuda = args.use_gpu
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 5 # 3, 5, 7
+k = 4 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
 convolutional_filters = 400
 batch_size = 20
 negative_answer_count_training = 50
-learning_rate = 0.05
+learning_rate = 1.1
 loss_margin = 0.5
-training_epochs = 1000
+training_epochs = 500
 test_rounds = 300
 
 if use_cuda:
@@ -167,6 +167,8 @@ print([x.size() for x in net.parameters()])
 for epoch in range(training_epochs):
     optimizer.zero_grad()   # zero the gradient buffers
 
+    adjust_learning_rate(epoch+1)
+
     loss = []
     for _ in range(batch_size):
         questions, answers, targets = training_dataset.next()
@@ -180,8 +182,7 @@ for epoch in range(training_epochs):
     print("Sum of parameters", [x.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
     print("Sum of gradients of parameters", [x.grad.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
 
-    sprint.p("Epoch %d, AVG loss: %2.3f" % (epoch+1, loss.item()/batch_size), 3)
-    #print([x.grad for x in net.parameters()])
+    sprint.p("Epoch %d, AVG loss: %2.8f" % (epoch+1, loss.item()/batch_size), 3)
 
 sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
