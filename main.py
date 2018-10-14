@@ -37,13 +37,13 @@ use_cuda = args.use_gpu
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 3 # 3, 5, 7
+k = 5 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 1000
+convolutional_filters = 400
 batch_size = 20
 negative_answer_count_training = 50
-learning_rate = 1
+learning_rate = 0.05
 loss_margin = 0.5
 training_epochs = 1000
 test_rounds = 300
@@ -137,7 +137,6 @@ print(t)
 sprint.p("Neural network creation",1)
 net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
 #net = networks.ClassicQANetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, convolutional_filters=convolutional_filters, context_len=3).to(device)
-
 sprint.p("NN Instantiated", 2)
 
 
@@ -178,8 +177,8 @@ for epoch in range(training_epochs):
     loss.backward()
     optimizer.step()    # Does the update
 
-    #print([x.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
-    #print([x.grad.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
+    print("Sum of parameters", [x.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
+    print("Sum of gradients of parameters", [x.grad.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
 
     sprint.p("Epoch %d, AVG loss: %2.3f" % (epoch+1, loss.item()/batch_size), 3)
     #print([x.grad for x in net.parameters()])

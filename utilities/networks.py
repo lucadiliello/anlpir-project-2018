@@ -1,7 +1,9 @@
+import math
 import torch
 import torch.nn as nn
+from torch.nn import Module, Parameter, init
 
-class WordEmbeddingModule(nn.Module):
+class WordEmbeddingModule(Module):
 
     def __init__(self, vocab_size, embedding_size, word_embedding_model=None):
         super(WordEmbeddingModule, self).__init__()
@@ -25,7 +27,7 @@ class WordEmbeddingModule(nn.Module):
         return sentences
 
 
-class CNN(nn.Module):
+class CNN(Module):
 
     def __init__(self, embedding_size, convolutional_filters, context_len):
         super(CNN, self).__init__()
@@ -49,7 +51,7 @@ class CNN(nn.Module):
         return sentence
 
 
-class biLSTM(nn.Module):
+class biLSTM(Module):
 
     def __init__(self, max_len, embedding_size, hidden_dim, device):
         super(biLSTM, self).__init__()
@@ -76,7 +78,7 @@ class biLSTM(nn.Module):
         return out
 
 
-class AttentivePoolingNetwork(nn.Module):
+class AttentivePoolingNetwork(Module):
 
     def __init__(self, vocab_size, embedding_size , word_embedding_model=None, type_of_nn='CNN', convolutional_filters=400, context_len=3):
         super(AttentivePoolingNetwork, self).__init__()
@@ -98,8 +100,10 @@ class AttentivePoolingNetwork(nn.Module):
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
-        self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
+        #self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
         #torch.nn.init.normal_(self.U, mean=0, std=0.1)
+        #self.U = nn.Linear(self.convolutional_filters, self.convolutional_filters, bias=False)
+        self.bilinear = Bilinear2D(self.convolutional_filters, self.convolutional_filters)
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -117,7 +121,8 @@ class AttentivePoolingNetwork(nn.Module):
         A = self.cnn_bilstm(answer)
         ## bs * c * L
 
-        G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
+        G = self.bilinear(Q.transpose(1,2), A).tanh()
+        #G = torch.tanh(self.U(Q.transpose(1,2)).matmul(A))
         ## bs * M * L
 
         roQ = torch.max(G, dim=2)[0]
@@ -125,14 +130,10 @@ class AttentivePoolingNetwork(nn.Module):
         roA = torch.max(G, dim=1)[0]
         ## bs * L
 
-        '''
         roQ = self.softmax(roQ)
         ## bs * M
         roA = self.softmax(roA)
         ## bs * L
-        '''
-        roQ = torch.tanh(roQ)
-        roA = torch.tanh(roA)
 
         rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
         ## bs * c
@@ -183,3 +184,36 @@ class ClassicQANetwork(nn.Module):
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)
         ## bs
+
+
+
+class Bilinear2D(nn.Module):
+
+    """ Apply Bilinear transformation with 2D input matrices: A * U * B + b"""
+
+    def __init__(self, in1_features, in2_features):
+        super(Bilinear2D, self).__init__()
+        assert(in1_features == in2_features)
+
+        self.in1_features = in1_features    # expected (*,b)
+        self.in2_features = in2_features    # expected (b,*)
+        ## out will be a tensor of size (N,a,c)
+
+        self.weight = Parameter(torch.Tensor(self.in1_features, self.in2_features))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
+    def forward(self, input1, input2):
+
+        if input1.dim() == 2 and input2.dim() == 2:
+            # fused op is marginally faster
+            return input1.mm(self.weight).mm(input2)
+
+        return input1.matmul(self.weight).matmul(input2)
+
+    def extra_repr(self):
+        return 'in1_features={}, in2_features={}'.format(
+            self.in1_features, self.in2_features
+        )
