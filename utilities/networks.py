@@ -99,7 +99,7 @@ class AttentivePoolingNetwork(nn.Module):
             raise ValueError('Mode must be CNN or biLSTM')
 
         self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
-        torch.nn.init.normal_(self.U, mean=0, std=0.1)
+        #torch.nn.init.normal_(self.U, mean=0, std=0.1)
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -117,8 +117,7 @@ class AttentivePoolingNetwork(nn.Module):
         A = self.cnn_bilstm(answer)
         ## bs * c * L
 
-        '''
-        G = torch.tanh(Q.transpose(1,2).contiguous().matmul(self.U).matmul(A))
+        G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
         ## bs * M * L
 
         roQ = torch.max(G, dim=2)[0]
@@ -126,25 +125,18 @@ class AttentivePoolingNetwork(nn.Module):
         roA = torch.max(G, dim=1)[0]
         ## bs * L
 
+        '''
         roQ = self.softmax(roQ)
         ## bs * M
         roA = self.softmax(roA)
         ## bs * L
+        '''
+        roQ = torch.tanh(roQ)
+        roA = torch.tanh(roA)
 
         rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
         ## bs * c
         rA = A.matmul(roA.unsqueeze(2)).squeeze()
-        ## bs * c
-        '''
-
-        rQ = torch.max(Q, dim=2)[0]
-        ## bs * c
-        rA = torch.max(A, dim=2)[0]
-        ## bs * c
-
-        rQ = torch.tanh(rQ)
-        ## bs * c
-        rA = torch.tanh(rA)
         ## bs * c
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)

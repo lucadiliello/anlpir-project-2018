@@ -22,10 +22,12 @@ parser = argparse.ArgumentParser(description='Create an AP network for Question 
 parser.add_argument("-n", help="type of the network, either CNN or biLSTM", type=str, default='CNN', dest='network_type', choices=['CNN','biLSTM'])
 parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=str, default='TrecQA', dest='dataset_name', choices=['TrecQA','WikiQA'])
 parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='Google', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch'])
+parser.add_argument("-p", help="use powerful cuda nvidia gpu", dest='use_gpu', action='store_true')
 args = parser.parse_args()
 network_type = args.network_type
 dataset_name = args.dataset_name
 model_type = args.model_type
+use_cuda = args.use_gpu
 
 
 
@@ -35,19 +37,21 @@ model_type = args.model_type
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 2 # 3, 5, 7
+k = 3 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 4000
+convolutional_filters = 1000
 batch_size = 20
-negative_answer_count_training = 20
-learning_rate = 0.05
-loss_margin = 0.009
+negative_answer_count_training = 50
+learning_rate = 1
+loss_margin = 0.5
 training_epochs = 1000
 test_rounds = 300
 
-#device = torch.device('cpu')
-device = torch.device('cuda') # Uncomment this to run on GPU
+if use_cuda:
+    device = torch.device('cuda')
+else:
+    device = torch.device('cpu')
 
 sprint.p('Will train on %s' % (torch.cuda.get_device_name(device) if device.type == 'cuda' else device.type), 2)
 
@@ -159,6 +163,8 @@ sprint.p("Starting",2)
 
 starting_time = time()
 
+print([x.size() for x in net.parameters()])
+
 for epoch in range(training_epochs):
     optimizer.zero_grad()   # zero the gradient buffers
 
@@ -176,6 +182,7 @@ for epoch in range(training_epochs):
     #print([x.grad.sum() if x.grad is not None else 'nograd' for x in net.parameters()])
 
     sprint.p("Epoch %d, AVG loss: %2.3f" % (epoch+1, loss.item()/batch_size), 3)
+    #print([x.grad for x in net.parameters()])
 
 sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
