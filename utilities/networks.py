@@ -27,6 +27,7 @@ class WordEmbeddingModule(Module):
         return sentences
 
 
+
 class CNN(Module):
 
     def __init__(self, embedding_size, convolutional_filters, context_len):
@@ -49,6 +50,7 @@ class CNN(Module):
         ## bs * c * M/L
 
         return sentence
+
 
 
 class biLSTM(Module):
@@ -76,6 +78,37 @@ class biLSTM(Module):
         out = out.transpose(1,2)
         ## bs*c*M
         return out
+
+
+
+class Bilinear2D(nn.Module):
+
+    """ Apply Bilinear transformation with 2D input matrices: A * U * B + b"""
+
+    def __init__(self, in1_features, in2_features):
+        super(Bilinear2D, self).__init__()
+        assert(in1_features == in2_features)
+
+        self.in1_features = in1_features    # expected (*,b)
+        self.in2_features = in2_features    # expected (b,*)
+        ## out will be a tensor of size (N,a,c)
+
+        self.weight = Parameter(torch.Tensor(self.in1_features, self.in2_features))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
+    def forward(self, input1, input2):
+        if input1.dim() == 2 and input2.dim() == 2:
+            # fused op is marginally faster
+            return input1.mm(self.weight).mm(input2)
+
+        return input1.matmul(self.weight).matmul(input2)
+
+    def extra_repr(self):
+        return 'in1_features={}, in2_features={}'.format(self.in1_features, self.in2_features)
+
 
 
 class AttentivePoolingNetwork(Module):
@@ -121,27 +154,24 @@ class AttentivePoolingNetwork(Module):
         A = self.cnn_bilstm(answer)
         ## bs * c * L
 
-        G = self.bilinear(Q.transpose(1,2), A).tanh()
+        #G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
         #G = torch.tanh(self.U(Q.transpose(1,2)).matmul(A))
+        G = self.bilinear(Q.transpose(1,2), A).tanh()
         ## bs * M * L
 
-        roQ = torch.max(G, dim=2)[0]
+        roQ = torch.max(G, dim=2)[0].softmax(dim=1)
         ## bs * M
-        roA = torch.max(G, dim=1)[0]
+        roA = torch.max(G, dim=1)[0].softmax(dim=1)
         ## bs * L
 
-        roQ = self.softmax(roQ)
-        ## bs * M
-        roA = self.softmax(roA)
-        ## bs * L
-
-        rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
+        rQ = Q.bmm(roQ.unsqueeze(2)).squeeze()
         ## bs * c
-        rA = A.matmul(roA.unsqueeze(2)).squeeze()
+        rA = A.bmm(roA.unsqueeze(2)).squeeze()
         ## bs * c
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)
         ## bs
+
 
 
 class ClassicQANetwork(nn.Module):
@@ -156,7 +186,6 @@ class ClassicQANetwork(nn.Module):
         self.embedding_layer = WordEmbeddingModule(vocab_size, embedding_size, word_embedding_model)
 
         self.cnn = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
-
 
     def forward(self, question, answer):
         ## question: bs * M
@@ -184,36 +213,3 @@ class ClassicQANetwork(nn.Module):
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)
         ## bs
-
-
-
-class Bilinear2D(nn.Module):
-
-    """ Apply Bilinear transformation with 2D input matrices: A * U * B + b"""
-
-    def __init__(self, in1_features, in2_features):
-        super(Bilinear2D, self).__init__()
-        assert(in1_features == in2_features)
-
-        self.in1_features = in1_features    # expected (*,b)
-        self.in2_features = in2_features    # expected (b,*)
-        ## out will be a tensor of size (N,a,c)
-
-        self.weight = Parameter(torch.Tensor(self.in1_features, self.in2_features))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-
-    def forward(self, input1, input2):
-
-        if input1.dim() == 2 and input2.dim() == 2:
-            # fused op is marginally faster
-            return input1.mm(self.weight).mm(input2)
-
-        return input1.matmul(self.weight).matmul(input2)
-
-    def extra_repr(self):
-        return 'in1_features={}, in2_features={}'.format(
-            self.in1_features, self.in2_features
-        )

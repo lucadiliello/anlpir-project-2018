@@ -1,4 +1,4 @@
-import random
+from random import shuffle
 import torch
 import numpy
 from utilities import sprint
@@ -30,11 +30,16 @@ class DatasetManager(object):
         sprint.p('Finding max lengths', 3)
         self.set_max_len()
 
-
         ### WORD-2-INDEX AND PADDING
         sprint.p('Word2index and padding', 3)
         self.WI_and_padding()
 
+        ### SHUFFLE DATA FOR BETTER TRAINING
+        self.reset()
+
+    def reset(self):
+        self.index = 0
+        shuffle(self.data)
 
     def __len__(self):
         return len(self.data)
@@ -43,11 +48,10 @@ class DatasetManager(object):
         self.max_question_len = max(list(map(lambda e: len(e['question']), self.data)))
         self.max_answer_len = max( list( map(lambda e: max( max(list(map(lambda x: len(x), e['candidates_pos']))),  max(list(map(lambda x: len(x), e['candidates_neg']))) ), self.data) ) )
 
-        
     def next(self):
-        index = random.randint(0, self.__len__() - 1)
-        entry = self.data[index]
-
+        entry = self.data[self.index]
+        self.index += 1
+        
         if self.hard_negative_training:
             risposte = [random.choice(entry['candidates_pos'])] + (random.sample(entry['candidates_neg'], self.negative_answer_count) if len(entry['candidates_neg']) > self.negative_answer_count else entry['candidates_neg'])
             domande = [entry['question']] * len(risposte)

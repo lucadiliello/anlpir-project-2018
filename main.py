@@ -24,6 +24,7 @@ parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=s
 parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='Google', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch'])
 parser.add_argument("-p", help="use powerful cuda nvidia gpu", dest='use_gpu', action='store_true')
 args = parser.parse_args()
+
 network_type = args.network_type
 dataset_name = args.dataset_name
 model_type = args.model_type
@@ -37,15 +38,15 @@ use_cuda = args.use_gpu
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 4 # 3, 5, 7
+k = 2 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
 convolutional_filters = 400
 batch_size = 20
 negative_answer_count_training = 50
-learning_rate = 1.1
+learning_rate = 0.05
 loss_margin = 0.5
-training_epochs = 500
+training_epochs = 2000
 test_rounds = 300
 
 if use_cuda:
@@ -151,6 +152,7 @@ net.train()
 optimizer = optim.SGD(net.parameters(), lr=learning_rate)
 criterion = losses.ObjectiveHingeLoss(loss_margin)
 
+
 def adjust_learning_rate(epo):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = learning_rate / epo
@@ -167,22 +169,29 @@ print([x.size() for x in net.parameters()])
 for epoch in range(training_epochs):
     optimizer.zero_grad()   # zero the gradient buffers
 
-    adjust_learning_rate(epoch+1)
+    #adjust_learning_rate(epoch+1)
 
     loss = []
     for _ in range(batch_size):
         questions, answers, targets = training_dataset.next()
         outputs = net(questions, answers)
         loss.append(criterion(outputs, targets))
-
     loss = sum(loss)
+
+    #previous = [x if x is not None else torch.tensor(0) for x in net.parameters()]
+
     loss.backward()
     optimizer.step()    # Does the update
+    '''
+    new = [x if x is not None else torch.tensor(0) for x in net.parameters()]
+    for i in range(len(new)):
+        new[i] = "%2.8f" % (new[i] - previous[i]).sum().item()
 
-    print("Sum of parameters", [x.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
+    print("Sum of parameters", new)
     print("Sum of gradients of parameters", [x.grad.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
-
+    '''
     sprint.p("Epoch %d, AVG loss: %2.8f" % (epoch+1, loss.item()/batch_size), 3)
+    #sprint.p("Epoch %d, AVG loss: %2.8f" % (epoch+1, loss.item()), 3)
 
 sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
