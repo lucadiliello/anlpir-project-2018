@@ -38,20 +38,17 @@ use_cuda = args.use_gpu
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 3 # 3, 5, 7
+k = 4 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 400
-batch_size = 25 ## at most 10 on a GPU with 3GB
-negative_answer_count_training = 50
+convolutional_filters = 1200
+batch_size = 6 ## at most 8 on a GPU with 3GB
+negative_answer_count_training = 20
 learning_rate = 0.05
 loss_margin = 0.5
 training_epochs = 25
 
-if use_cuda:
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
+device = torch.device('cuda') if use_cuda and torch.cuda.is_available() else torch.device('cpu')
 
 sprint.p('Will train on %s' % (torch.cuda.get_device_name(device) if device.type == 'cuda' else device.type), 2)
 
@@ -215,7 +212,7 @@ for epoch in range(training_epochs):
         optimizer.zero_grad()   # zero the gradient buffers
 
         batch = training_dataset.next()
-        if batch is None:
+        if batch is None:    ## round on the training set complete, go to next epoch
             break
 
         loss = train_batch(batch)
