@@ -19,12 +19,7 @@ class WordEmbeddingModule(Module):
             self.embedding_layer = nn.Embedding(self.vocab_size + 1, self.embedding_size, padding_idx=0)
 
     def forward(self, sentences):
-        ## sentences: bs * M/L
-
-        sentences = self.embedding_layer(sentences)
-        ## bs * M/L * d
-
-        return sentences
+        return self.embedding_layer(sentences)
 
 
 
@@ -40,8 +35,7 @@ class CNN(Module):
         self.conv = nn.Conv1d(self.embedding_size, self.convolutional_filters, self.context_len, padding=1)
 
     def forward(self, sentence):
-        ## question: bs * M * d
-        ## answer: bs * L * d
+        ## bs * M/L * d
 
         sentence = sentence.transpose(1, 2)
         ## bs * d * M/L
@@ -133,29 +127,23 @@ class AttentivePoolingNetwork(Module):
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
-        #self.U = torch.nn.Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters))
-        #torch.nn.init.normal_(self.U, mean=0, std=0.1)
-        #self.U = nn.Linear(self.convolutional_filters, self.convolutional_filters, bias=False)
         self.bilinear = Bilinear2D(self.convolutional_filters, self.convolutional_filters)
 
-        self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, question, answer):
-        ## question: bs * M
-        ## answer: bs * L
+    def forward(self, questions, answers):
+        ## questions: bs * M
+        ## answers: bs * L
 
-        question = self.embedding_layer(question)
+        questions = self.embedding_layer(questions)
         ## bs * M * d
-        answer = self.embedding_layer(answer)
-        ## bs * M * d
+        answers = self.embedding_layer(answers)
+        ## bs * L * d
 
-        Q = self.cnn_bilstm(question)
+        Q = self.cnn_bilstm(questions)
         ## bs * c * M
-        A = self.cnn_bilstm(answer)
+        A = self.cnn_bilstm(answers)
         ## bs * c * L
 
-        #G = torch.tanh(Q.transpose(1,2).matmul(self.U).matmul(A))
-        #G = torch.tanh(self.U(Q.transpose(1,2)).matmul(A))
         G = self.bilinear(Q.transpose(1,2), A).tanh()
         ## bs * M * L
 
@@ -164,9 +152,9 @@ class AttentivePoolingNetwork(Module):
         roA = torch.max(G, dim=1)[0].softmax(dim=1)
         ## bs * L
 
-        rQ = Q.bmm(roQ.unsqueeze(2)).squeeze()
+        rQ = Q.matmul(roQ.unsqueeze(2)).squeeze()
         ## bs * c
-        rA = A.bmm(roA.unsqueeze(2)).squeeze()
+        rA = A.matmul(roA.unsqueeze(2)).squeeze()
         ## bs * c
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)
@@ -187,28 +175,23 @@ class ClassicQANetwork(nn.Module):
 
         self.cnn = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
 
-    def forward(self, question, answer):
-        ## question: bs * M
-        ## answer: bs * L
+    def forward(self, questions, answers):
+        ## questions: bs * M
+        ## answers: bs * L
 
-        question = self.embedding_layer(question)
+        questions = self.embedding_layer(questions)
         ## bs * M * d
-        answer = self.embedding_layer(answer)
-        ## bs * M * d
+        answers = self.embedding_layer(answers)
+        ## bs * L * d
 
-        Q = self.cnn(question)
+        Q = self.cnn(questions)
         ## bs * c * M
-        A = self.cnn(answer)
+        A = self.cnn(answers)
         ## bs * c * L
 
-        rQ = torch.max(Q, dim=2)[0]
+        rQ = torch.max(Q, dim=2)[0].tanh()
         ## bs * c
-        rA = torch.max(A, dim=2)[0]
-        ## bs * c
-
-        rQ = torch.tanh(rQ)
-        ## bs * c
-        rA = torch.tanh(rA)
+        rA = torch.max(A, dim=2)[0].tanh()
         ## bs * c
 
         return torch.nn.functional.cosine_similarity(rQ, rA, dim=1, eps=1e-08)

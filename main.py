@@ -38,16 +38,15 @@ use_cuda = args.use_gpu
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 2 # 3, 5, 7
+k = 3 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
 convolutional_filters = 400
-batch_size = 20
+batch_size = 25 ## at most 10 on a GPU with 3GB
 negative_answer_count_training = 50
 learning_rate = 0.05
 loss_margin = 0.5
-training_epochs = 2000
-test_rounds = 300
+training_epochs = 25
 
 if use_cuda:
     device = torch.device('cuda')
@@ -68,7 +67,6 @@ training_set, validation_set, test_set = loader.load()
 sprint.p('Datasets loaded', 2)
 
 
-
 ################################################################################
 ### LOADING WORD EMBEDDINGS MODEL
 ################################################################################
@@ -83,7 +81,7 @@ elif model_type == 'GoogleRed':
     we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
     word_embedding_size = we_model.wv.syn0.shape[1]
 elif model_type == 'LearnGensim':
-    we_model = custom.word_embedding_model(documents, word_embedding_size, word_embedding_window, n_threads)
+    we_model = custom.word_embedding_model(loader.get_documents(), word_embedding_size, word_embedding_window, 8)
 elif model_type == 'LearnPyTorch':
     we_model = None
 else:
@@ -107,9 +105,9 @@ vocabulary = {key: (value.index + 1) for (key, value) in we_model.wv.vocab.items
 ### LOADING DATASET
 ################################################################################
 
-sprint.p('Creating batch manager', 1)
+sprint.p('Creating batch manager on dataset %s' % dataset_name, 1)
 sprint.p('Train', 2)
-training_dataset = datasets.DatasetManager(training_set, vocabulary, device, hard_negative_training=True, negative_answer_count=negative_answer_count_training)
+training_dataset = datasets.DatasetManager(training_set, vocabulary, device, batch_size=batch_size, hard_negative_training=True, max_negative_answer_count=negative_answer_count_training)
 sprint.p('Valid', 2)
 validation_dataset = datasets.DatasetManager(validation_set, vocabulary, device)
 sprint.p('Test', 2)
@@ -143,7 +141,7 @@ sprint.p("NN Instantiated", 2)
 
 
 ################################################################################
-### TRAINING NETWORK
+### SETUP FOR TRAINING
 ################################################################################
 
 sprint.p("Training NN",1)
@@ -162,37 +160,70 @@ def adjust_learning_rate(epo):
 sprint.p('Batch size: %d' % batch_size, 2)
 sprint.p("Starting",2)
 
-starting_time = time()
 
-print([x.size() for x in net.parameters()])
-
-for epoch in range(training_epochs):
-    optimizer.zero_grad()   # zero the gradient buffers
-
-    #adjust_learning_rate(epoch+1)
+### trains on a batch and returns the sum of the losses
+def train_batch(batch):
+    sizes, questions, answers, targets = batch
+    assert len(questions) == len(answers) == len(targets)
+    outputs = net(questions, answers)
 
     loss = []
-    for _ in range(batch_size):
-        questions, answers, targets = training_dataset.next()
+    base_index = 0
+    for size in sizes:
+        loss.append(criterion(outputs[base_index: base_index+size], targets[base_index: base_index+size]))
+        base_index += size
+
+    return sum(loss)
+
+### test the actual network on an entire dataset and returns MAP and MRR
+def test_on_dataset(ds):
+    ds.reset()
+
+    res_outputs = []
+    res_targets = []
+
+    while True:
+        batch = ds.next()
+        if batch is None:
+            break
+
+        sizes, questions, answers, targets = batch
         outputs = net(questions, answers)
-        loss.append(criterion(outputs, targets))
-    loss = sum(loss)
 
-    #previous = [x if x is not None else torch.tensor(0) for x in net.parameters()]
+        base_index = 0
+        for size in sizes:
+            res_outputs.append(outputs[base_index: base_index+size])
+            res_targets.append(targets[base_index: base_index+size])
+            base_index += size
 
-    loss.backward()
-    optimizer.step()    # Does the update
-    '''
-    new = [x if x is not None else torch.tensor(0) for x in net.parameters()]
-    for i in range(len(new)):
-        new[i] = "%2.8f" % (new[i] - previous[i]).sum().item()
+    return (metrics.MRR(res_outputs, res_targets), metrics.MAP(res_outputs, res_targets))
 
-    print("Sum of parameters", new)
-    print("Sum of gradients of parameters", [x.grad.sum().item() if x.grad is not None else 'nograd' for x in net.parameters()])
-    '''
-    sprint.p("Epoch %d, AVG loss: %2.8f" % (epoch+1, loss.item()/batch_size), 3)
-    #sprint.p("Epoch %d, AVG loss: %2.8f" % (epoch+1, loss.item()), 3)
 
+################################################################################
+### TRAINING
+################################################################################
+
+## Starting training time
+starting_time = time()
+
+for epoch in range(training_epochs):
+
+    #adjust_learning_rate(epoch+1)
+    training_dataset.reset()
+
+    while True:
+        optimizer.zero_grad()   # zero the gradient buffers
+
+        batch = training_dataset.next()
+        if batch is None:
+            break
+
+        loss = train_batch(batch)
+        loss.backward()
+        optimizer.step()    # Does the update
+        sprint.p("Batch trained, AVG loss: %2.8f" % (loss.item()/batch_size), 3)
+
+    sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f' % (epoch+1, *test_on_dataset(validation_dataset)), 2)
 sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
 
@@ -203,21 +234,8 @@ sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
 sprint.p("Testing NN", 1)
 starting_time = time()
-
-res_outputs = []
-res_targets = []
-
 sprint.p('Starting', 2)
 
-for round in range(test_rounds):
-    questions, answers, targets = test_dataset.next()
-    outputs = net(questions, answers)
-
-    res_outputs.append(outputs)
-    res_targets.append(targets)
-
-    sprint.p('Round %d' % (round+1), 3)
-
-sprint.p('MRR: %2.2f, MAP: %2.2f' % (metrics.MRR(res_outputs, res_targets), metrics.MAP(res_outputs, res_targets)), 2)
+sprint.p('MRR: %2.2f, MAP: %2.2f' % test_on_dataset(test_dataset), 2)
 
 sprint.p('Testing done, it took %.2f seconds' % (time()-starting_time), 2)

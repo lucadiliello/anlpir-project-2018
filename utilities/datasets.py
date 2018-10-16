@@ -1,4 +1,5 @@
 from random import shuffle
+import random
 import torch
 import numpy
 from utilities import sprint
@@ -6,13 +7,14 @@ from functools import reduce
 
 class DatasetManager(object):
 
-    def __init__(self, data, word2index, device, hard_negative_training=False, negative_answer_count=20):
+    def __init__(self, data, word2index, device, hard_negative_training=False, batch_size=20, max_negative_answer_count=20):
         super(DatasetManager, self).__init__()
         self.hard_negative_training = hard_negative_training
         self.data = data
         self.device = device
-        ### only if hard_negative_training is True
-        self.negative_answer_count = negative_answer_count
+        self.batch_size = batch_size
+        ### used only if hard_negative_training is True
+        self.max_negative_answer_count = max_negative_answer_count
 
         self.word2index = word2index
         self.max_question_len = 0
@@ -49,22 +51,33 @@ class DatasetManager(object):
         self.max_answer_len = max( list( map(lambda e: max( max(list(map(lambda x: len(x), e['candidates_pos']))),  max(list(map(lambda x: len(x), e['candidates_neg']))) ), self.data) ) )
 
     def next(self):
-        entry = self.data[self.index]
-        self.index += 1
-        
-        if self.hard_negative_training:
-            risposte = [random.choice(entry['candidates_pos'])] + (random.sample(entry['candidates_neg'], self.negative_answer_count) if len(entry['candidates_neg']) > self.negative_answer_count else entry['candidates_neg'])
-            domande = [entry['question']] * len(risposte)
-            target = [1.] + [0.] * (len(risposte) - 1)
-            # question, answers, targets
-            return (torch.tensor(domande, requires_grad=False, device=self.device), torch.tensor(risposte, requires_grad=False, device=self.device), torch.tensor(target, requires_grad=False, device=self.device))
-        else:
-            risposte = entry['candidates_pos'] + entry['candidates_neg']
-            domande = [entry['question']] * len(risposte)
-            target = [1.] * len(entry['candidates_pos']) + [0.] * len(entry['candidates_neg'])
-            # question, answers, targets
-            return (torch.tensor(domande, requires_grad=False, device=self.device), torch.tensor(risposte, requires_grad=False, device=self.device), torch.tensor(target, requires_grad=False, device=self.device))
+        if self.index >= self.__len__():
+            return None
 
+        batch = self.data[self.index : self.index+self.batch_size]
+        self.index += self.batch_size
+
+        res_sizes = []
+        res_domande = []
+        res_risposte = []
+        res_target = []
+
+        for entry in batch:
+            if self.hard_negative_training:
+                risposte = [random.choice(entry['candidates_pos'])] + (random.sample(entry['candidates_neg'], self.max_negative_answer_count) if len(entry['candidates_neg']) > self.max_negative_answer_count else entry['candidates_neg'])
+                target = [1.] + [0.] * (len(risposte) - 1)
+            else:
+                risposte = entry['candidates_pos'] + entry['candidates_neg']
+                target = [1.] * len(entry['candidates_pos']) + [0.] * len(entry['candidates_neg'])
+
+            domande = [entry['question']] * len(risposte)
+
+            res_domande += domande
+            res_risposte += risposte
+            res_target += target
+            res_sizes.append(len(risposte))
+        # sizes, question, answers, targets
+        return (res_sizes, torch.tensor(res_domande, requires_grad=False, device=self.device), torch.tensor(res_risposte, requires_grad=False, device=self.device), torch.tensor(res_target, requires_grad=False, device=self.device))
 
     def remove_entries_without_a_labels(self):
         res = []
