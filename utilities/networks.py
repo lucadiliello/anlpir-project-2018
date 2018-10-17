@@ -134,8 +134,7 @@ class AttentivePoolingNetwork(Module):
 
         questions = self.embedding_layer(questions)
         ## bs * M * d
-        print(questions.size())
-        exit()
+    
         answers = self.embedding_layer(answers)
         ## bs * L * d
 
