@@ -134,7 +134,7 @@ class AttentivePoolingNetwork(Module):
 
         questions = self.embedding_layer(questions)
         ## bs * M * d
-    
+
         answers = self.embedding_layer(answers)
         ## bs * L * d
 
@@ -173,6 +173,7 @@ class ClassicQANetwork(nn.Module):
 
         self.embedding_layer = WordEmbeddingModule(vocab_size, embedding_size, word_embedding_model)
 
+        #self.cnn = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
         self.bilstm_q = biLSTM(self.M, self.embedding_size,  self.convolutional_filters)
         self.bilstm_a = biLSTM(self.L, self.embedding_size,  self.convolutional_filters)
 
