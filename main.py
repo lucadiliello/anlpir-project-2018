@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description='Create an AP network for Question 
 
 parser.add_argument("-n", help="type of the network, either CNN or biLSTM", type=str, default='CNN', dest='network_type', choices=['CNN','biLSTM'])
 parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=str, default='TrecQA', dest='dataset_name', choices=['TrecQA','WikiQA'])
-parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='Google', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch'])
+parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='LearnPyTorch', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch'])
 parser.add_argument("-p", help="use powerful cuda nvidia gpu", dest='use_gpu', action='store_true')
 args = parser.parse_args()
 
@@ -131,7 +131,7 @@ print(t)
 ################################################################################
 
 sprint.p("Neural network creation",1)
-net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn=network_type, convolutional_filters=convolutional_filters, context_len=k).to(device)
+net = networks.ClassicQANetwork((training_dataset.max_question_len, training_dataset.max_answer_len),len(vocabulary), word_embedding_size, word_embedding_model=we_model, convolutional_filters=convolutional_filters, context_len=k).to(device)
 #net = networks.ClassicQANetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, convolutional_filters=convolutional_filters, context_len=3).to(device)
 sprint.p("NN Instantiated", 2)
 
@@ -216,7 +216,7 @@ for epoch in range(training_epochs):
             break
 
         loss = train_batch(batch)
-        loss.backward()
+        loss.backward(retain_graph=True)
         optimizer.step()    # Does the update
         sprint.p("Batch trained, AVG loss: %2.8f" % (loss.item()/batch_size), 3)
 

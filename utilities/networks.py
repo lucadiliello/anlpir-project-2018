@@ -46,14 +46,12 @@ class CNN(Module):
         return sentence
 
 
-
 class biLSTM(Module):
 
-    def __init__(self, max_len, embedding_size, hidden_dim, device):
+    def __init__(self, max_len, embedding_size, hidden_dim):
         super(biLSTM, self).__init__()
 
         hidden_dim = int(hidden_dim/2)
-        self.device = device
         self.max_len = max_len
         self.hidden_dim = hidden_dim
         self.embedding_size = embedding_size
@@ -136,6 +134,8 @@ class AttentivePoolingNetwork(Module):
 
         questions = self.embedding_layer(questions)
         ## bs * M * d
+        print(questions.size())
+        exit()
         answers = self.embedding_layer(answers)
         ## bs * L * d
 
@@ -163,17 +163,19 @@ class AttentivePoolingNetwork(Module):
 
 
 class ClassicQANetwork(nn.Module):
-    def __init__(self, vocab_size, embedding_size, word_embedding_model=None, convolutional_filters=400, context_len=3):
+    def __init__(self, max_len, vocab_size, embedding_size, word_embedding_model=None, convolutional_filters=400, context_len=3):
         super(ClassicQANetwork, self).__init__()
 
         self.convolutional_filters = convolutional_filters
         self.context_len = context_len
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
+        self.M, self.L = max_len
 
         self.embedding_layer = WordEmbeddingModule(vocab_size, embedding_size, word_embedding_model)
 
-        self.cnn = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
+        self.bilstm_q = biLSTM(self.M, self.embedding_size,  self.convolutional_filters)
+        self.bilstm_a = biLSTM(self.L, self.embedding_size,  self.convolutional_filters)
 
     def forward(self, questions, answers):
         ## questions: bs * M
@@ -184,9 +186,9 @@ class ClassicQANetwork(nn.Module):
         answers = self.embedding_layer(answers)
         ## bs * L * d
 
-        Q = self.cnn(questions)
+        Q = self.bilstm_q(questions)
         ## bs * c * M
-        A = self.cnn(answers)
+        A = self.bilstm_a(answers)
         ## bs * c * L
 
         rQ = torch.max(Q, dim=2)[0].tanh()
