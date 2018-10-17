@@ -38,15 +38,15 @@ use_cuda = args.use_gpu
 
 sprint.p('Initializing Hyperparameters', 1)
 
-k = 4 # 3, 5, 7
+k = 2 # 3, 5, 7
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 1200
-batch_size = 6 ## at most 8 on a GPU with 3GB
+convolutional_filters = 2000
+batch_size = 1 ## at most 8 on a GPU with 3GB
 negative_answer_count_training = 20
 learning_rate = 0.05
-loss_margin = 0.5
-training_epochs = 25
+loss_margin = 0.009
+training_epochs = 30
 
 device = torch.device('cuda') if use_cuda and torch.cuda.is_available() else torch.device('cpu')
 
@@ -106,9 +106,9 @@ sprint.p('Creating batch manager on dataset %s' % dataset_name, 1)
 sprint.p('Train', 2)
 training_dataset = datasets.DatasetManager(training_set, vocabulary, device, batch_size=batch_size, hard_negative_training=True, max_negative_answer_count=negative_answer_count_training)
 sprint.p('Valid', 2)
-validation_dataset = datasets.DatasetManager(validation_set, vocabulary, device)
+validation_dataset = datasets.DatasetManager(validation_set, vocabulary, device, batch_size=batch_size)
 sprint.p('Test', 2)
-test_dataset = datasets.DatasetManager(test_set, vocabulary, device)
+test_dataset = datasets.DatasetManager(test_set, vocabulary, device, batch_size=batch_size)
 sprint.p('Done', 2)
 
 
@@ -205,7 +205,7 @@ starting_time = time()
 
 for epoch in range(training_epochs):
 
-    #adjust_learning_rate(epoch+1)
+    adjust_learning_rate(epoch+1)
     training_dataset.reset()
 
     while True:

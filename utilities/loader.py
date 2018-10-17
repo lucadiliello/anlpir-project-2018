@@ -12,7 +12,7 @@ class Loader:
         return 'Loader object of type %s' % self.pkg_name
 
     def get_vocabulary(self):
-        docs = get_sentences()
+        docs = self.get_documents()
         vocab = dict()
         index = 1
         for sent in docs:
