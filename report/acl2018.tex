@@ -1,0 +1,200 @@
+%
+% File acl2018.tex
+%
+%% Based on the style files for ACL-2017, with some changes, which were, in turn,
+%% Based on the style files for ACL-2015, with some improvements
+%%  taken from the NAACL-2016 style
+%% Based on the style files for ACL-2014, which were, in turn,
+%% based on ACL-2013, ACL-2012, ACL-2011, ACL-2010, ACL-IJCNLP-2009,
+%% EACL-2009, IJCNLP-2008...
+%% Based on the style files for EACL 2006 by 
+%%e.agirre@ehu.es or Sergi.Balari@uab.es
+%% and that of ACL 08 by Joakim Nivre and Noah Smith
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[hyperref]{acl2018}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{amsmath}
+
+\usepackage{url}
+
+\aclfinalcopy % Uncomment this line for the final submission
+%\def\aclpaperid{***} %  Enter the acl Paper ID here
+
+%\setlength\titlebox{5cm}
+% You can expand the titlebox if you need extra space
+% to show all the authors. Please do not make the titlebox
+% smaller than 5cm (the original size); we will check this
+% in the camera-ready version and ask you to change it back.
+
+\newcommand\BibTeX{B{\sc ib}\TeX}
+
+\title{ANLP and IR project - Attentive pooling in CNN and BiLSTM}
+
+\author{Paganin Martina and Luca di Liello \\
+  Universit\`a degli studi di Trento \\
+  {\tt martina.paganin@studenti.unitn.it
+       luca.diliello@studenti.unitn.it} \\
+}
+
+\date{16/10/2018}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+  lo scriviamo alla fine
+\end{abstract}
+
+\section{Introduction}
+(Spieghiamo un po cosa riporta l'articolo, qual'è lo scopo, cosa ne salta fuori e che è stato replicato usando pytorch.)
+
+This paper reports the development of Attentive Pooling, a method proposed in FONTE. This methodology aims at building a model, more specifically, a neural network, which has to learn how to discriminate pair-wise ranking.
+
+Attentive pooling has to learn a similarity measure over pairs of question-answer in order to perform the ranking. 
+
+According to the aforementioned paper, the attentive pooling step improves traditional neural network (CNN and BiLSTM) performances. 
+Our implementation reproduces the method proposed in the paper, with some slight differences (mostly to speed up execution time) that will be discussed in the following sections.
+
+\section{Methodology}
+The method proposed reflects the structure suggested by the referenced paper, so both a CNN and a BiLSTM were implemented following the scheme and the instructions explained in the paper.
+
+The networks are trained by feeding them with batches composed of tuples. A batch is composed as follow: [(question, correct\_answer), (question, incorrect\_random\_answer1), ..., (question, incorrect\_random\_answer50)].
+
+Detailed explanations of the two networks and the attentive pooling method follow in the next sections.
+
+Both networks work on inputs in an embedded form. This means that, first of all, fixed-length independent continuous vector representations are computed. Then, the networks proceed through different steps.
+
+Finally, both methods operate max-pooling and then compute cosine similarity between question and answers representations. 
+\subsection{The CNN}
+The paper suggests to create a particular input representation (the Z vector) before the convolutional phase. Both question and answer are processed by the same network in order to derive the same weights matrix. The number of convolutional filters were initially chosen as those reported in the paper but then, due to problem in the convergence of the network, they were further increased.
+
+inventarsi ancora qualcosa
+
+\subsection{The BiLSTM}
+The bidirectional LSTM network takes as input embedded questions and answers, as the previous described convolutional neural network. This kind of network has the ability of processing the sequence in two directions, utilizing the information of future tokens. In our implementation the hidden vector size was chosen as the one suggested in the paper. 
+
+provarne altre magari?
+
+Running this kind of network take considerably more time than the CNN, maybe due to the fact that the latter has a less complex structure and then a faster training phase. BiLSTM has instead to learn and remember more information and its execution is consequently more computational expensive.
+
+\subsection{Attentive Pooling}
+Attentive Pooling is the method proposed by the authors of the referenced paper to improve the discriminative models' performance on pair-wise ranking. This layer aims at learning the representations of both inputs and their similarity measurement. The main idea is learning the similarity between the two inputs and then perform a pooling phase on the previously obtained vectors. 
+Attentive pooling can be applied to CNNs and also to RNNs, and in this experiment it can be found as final step in the model.
+
+\subsection{Word Embedding model}
+As said before, the input for the two networks is in an embedding form, so an embedding layer is necessary in the first phase. Embedding models are useful for computing vector representation of words, and in this implementation different models were tried:
+
+\begin{itemize}
+    \item LearnPytorch
+    \item Word2Vec (gensim)
+    \item Google
+    \item Google Reduced
+\end{itemize}
+
+The torch.nn.Embedding module allows to encode word as vectors of real numbers, which is an essential processing phase in NLP tasks. 
+The Word2Vec is a pre-trained embedding model which learns vector representations of word from the vocabulary learned on the training set.
+
+Scrivere qualcosa sugli altri
+
+\subsection{Differences from the suggested implementation}
+paragrafetto su cose diverse da articolo e why
+
+\section{Datasets description}
+Two dataset were used to train and test the architectures, TREC-QA and WikiQA. These test sets are organized as a list of candidate answers for each one of the questions in the test set.
+
+TREC-QA has been processed removing only positive or negative answers. The longest question is composed by 27 words, while the longest answer has 204 words. 
+
+Wiki-QA eccc
+
+qualche tabella con qualche numero?
+
+\section{Issues faced during development}
+Descrivere brevemente problematiche incontrate e come sono state affrontate 
+
+
+
+\begin{table}[t!]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline \bf Entity & \bf Frequency & \bf Total \# of instances \\ \hline
+Cuisine & 70 & 573\\
+Info & 2 & 16\\
+Location & 9 & 338\\
+People & 4 & 12\\
+Price info & 6 & 354\\
+Total &  & 1293\\
+\hline
+\end{tabular}
+\end{center}
+\caption{\label{font-table} Intent distribution }
+\end{table}
+
+
+
+\section{Evaluation}
+
+\subsection{CNN}
+
+\begin{table}[t!]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline \bf & \bf NER CRF & \bf NER SPACY \\ \hline
+Accuracy & 0.99 & 0.985 \\
+F1 score & 0.99 & 0.984 \\
+Precision & 0.99 & 0.985 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{\label{font-table} Evaluation NLU model }
+\end{table}
+
+\subsection{BiLSTM}
+
+\subsection{Version with Attentive Pooling}
+cosa aggiunge e perchè sarebbe utile
+
+
+\section{Results and discussion}
+cosa ci viene, tabelle varie, qualche commento su utilità attentive pooling
+
+\begin{table}[t!]
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline \bf Intent & \bf Frequency \\ \hline
+Affirm & 260 \\
+Deny & 85 \\
+Greet & 13 \\
+Inform & 1014 \\
+Request info & 16 \\
+Thank you & 589 \\
+Total & 1977 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{\label{font-table} Intent distribution }
+\end{table}
+
+\begin{table}[t!]
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline \bf Policy & \bf Average F1 \\ \hline
+Augm.-Sklearn & 0.924 \\
+Augm.(10 max history)-Rest. & 0.501 \\
+Restaurant & 0.537 \\
+Sklearn & 0.840 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{\label{font-table} Evaluation dialog model }
+\end{table}
+
+\bibliography{acl2018}
+\bibliographystyle{plain}
+
+\end{document}
+
+
+
+
+
