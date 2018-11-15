@@ -1,5 +1,7 @@
-from utilities import sprint
+from utilities import sprint as sp
 import gensim
+
+sprint = sp.SPrint()
 
 def word_embedding_model(documents, word_embedding_size, word_embedding_window, n_threads):
     sprint.p('WE custom model creation', 1)

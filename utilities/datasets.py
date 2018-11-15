@@ -2,12 +2,14 @@ from random import shuffle
 import random
 import torch
 import numpy
-from utilities import sprint
+from utilities import sprint as sp
 from functools import reduce
+
+sprint = sp.SPrint()
 
 class DatasetManager(object):
 
-    def __init__(self, data, word2index, device, hard_negative_training=False, batch_size=20, max_negative_answer_count=20):
+    def __init__(self, data, word2index, device, hard_negative_training=False, batch_size=20, max_negative_answer_count=20, silent_mode=False):
         super(DatasetManager, self).__init__()
         self.hard_negative_training = hard_negative_training
         self.data = data
@@ -15,6 +17,9 @@ class DatasetManager(object):
         self.batch_size = batch_size
         ### used only if hard_negative_training is True
         self.max_negative_answer_count = max_negative_answer_count
+
+        if silent_mode:
+            sprint.deactivate()
 
         self.word2index = word2index
         self.max_question_len = 0
