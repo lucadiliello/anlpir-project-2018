@@ -1,0 +1,3 @@
+New TESTS with AP-CNN, WikiQA,GoogleRed
+Round - ( k:5, batch_size: 2, learning_rate: 0.010, loss_margin: 0.500, training_epochs: 25 ) -> CUDA_ERRORNew TESTS with AP-CNN, WikiQA,GoogleRed
+Round - ( k:5, batch_size: 2, learning_rate: 0.010, loss_margin: 0.500, training_epochs: 25 ) -> ( MRR: 0.579, MAP: 0.573, time: 206s)
