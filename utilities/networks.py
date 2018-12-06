@@ -162,8 +162,8 @@ class AttentivePoolingNetwork(Module):
 
 
 class ClassicQANetwork(nn.Module):
-    #def __init__(self, max_len, vocab_size, embedding_size, word_embedding_model=None, convolutional_filters=400, context_len=3):
-    def __init__(self, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
+    def __init__(self, max_len, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
+    #def __init__(self, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
         super(ClassicQANetwork, self).__init__()
 
         self.convolutional_filters = convolutional_filters
@@ -171,12 +171,15 @@ class ClassicQANetwork(nn.Module):
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
         self.network_type = network_type
+        #self.M, self.L = max_len
 
         self.embedding_layer = WordEmbeddingModule(vocab_size, embedding_size, word_embedding_model)
 
+        #if network_type == 'CNN':
         self.cnn = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
-        #self.bilstm_q = biLSTM(self.M, self.embedding_size,  self.convolutional_filters)
-        #self.bilstm_a = biLSTM(self.L, self.embedding_size,  self.convolutional_filters)
+        #else:
+        #    self.bilstm_q = biLSTM(self.M, self.embedding_size,  self.convolutional_filters)
+        #    self.bilstm_a = biLSTM(self.L, self.embedding_size,  self.convolutional_filters)
 
     def forward(self, questions, answers):
         ## questions: bs * M
