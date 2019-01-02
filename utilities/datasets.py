@@ -59,7 +59,7 @@ class DatasetManager(object):
         if self.index >= self.__len__():
             return None
 
-        batch = self.data[self.index : self.index+self.batch_size]
+        batch = self.data[self.index : self.index + self.batch_size]
         self.index += self.batch_size
 
         res_sizes = []

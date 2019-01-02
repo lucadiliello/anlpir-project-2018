@@ -174,6 +174,7 @@ def launch_train_test(
     def train_batch(batch):
         sizes, questions, answers, targets = batch
         assert len(questions) == len(answers) == len(targets)
+        #print(questions.size())
         outputs = net(questions, answers)
 
         loss = []
@@ -230,7 +231,7 @@ def launch_train_test(
             loss = train_batch(batch)
             loss.backward(retain_graph=True)
             optimizer.step()    # Does the update
-            sprint.p("Batch trained, AVG loss: %2.8f" % (loss.item()/batch_size), 3)
+            #sprint.p("Batch trained, AVG loss: %2.8f" % (loss.item()/batch_size), 3)
 
         if validate:
             sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f' % (epoch+1, *test_on_dataset(validation_dataset)), 2)
@@ -247,7 +248,7 @@ def launch_train_test(
     sprint.p('Starting', 2)
 
     MRR, MAP = test_on_dataset(test_dataset)
-    sprint.p('MRR: %2.2f, MAP: %2.2f' % (MRR, MAP), 2)
+    sprint.p('MAP: %2.2f, MRR: %2.2f' % (MAP,MRR), 2)
 
     sprint.p('Testing done, it took %.2f seconds' % (time()-starting_time), 2)
 

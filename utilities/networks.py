@@ -48,27 +48,27 @@ class CNN(Module):
 
 class biLSTM(Module):
 
-    def __init__(self, max_len, embedding_size, hidden_dim):
+    def __init__(self, embedding_size, hidden_dim, bidirectional=True):
         super(biLSTM, self).__init__()
 
-        hidden_dim = int(hidden_dim/2)
-        self.max_len = max_len
         self.hidden_dim = hidden_dim
         self.embedding_size = embedding_size
 
-        self.lstm = nn.LSTM(embedding_size, hidden_dim, bidirectional=True)
+        self.lstm = nn.LSTM(self.embedding_size, self.hidden_dim, bidirectional=True, batch_first=True)
 
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
-        return (torch.zeros(2, self.max_len, self.hidden_dim),
-                torch.zeros(2, self.max_len, self.hidden_dim))
+        ##
+        return (torch.zeros(1 * 2, self.max_len, self.hidden_dim),
+                torch.zeros(1 * 2, self.max_len, self.hidden_dim))
 
     def forward(self, x):
+        ## bs * M/L * d -> (batch, seq_len, input_size)
         out, self.hidden = self.lstm(x, self.hidden)
-        ## bs*M*c
+        ## bs * M * c
         out = out.transpose(1,2)
-        ## bs*c*M
+        ## bs * c * M
         return out
 
 
@@ -162,8 +162,8 @@ class AttentivePoolingNetwork(Module):
 
 
 class ClassicQANetwork(nn.Module):
-    def __init__(self, max_len, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
-    #def __init__(self, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
+    #def __init__(self, max_len, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
+    def __init__(self, vocab_size, embedding_size, word_embedding_model=None, network_type='CNN', convolutional_filters=400, context_len=3):
         super(ClassicQANetwork, self).__init__()
 
         self.convolutional_filters = convolutional_filters
