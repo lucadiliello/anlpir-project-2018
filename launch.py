@@ -174,7 +174,7 @@ def launch_train_test(
     def train_batch(batch):
         sizes, questions, answers, targets = batch
         assert len(questions) == len(answers) == len(targets)
-        #print(questions.size())
+        
         outputs = net(questions, answers)
 
         loss = []

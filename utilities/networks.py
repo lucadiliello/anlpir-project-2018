@@ -2,6 +2,9 @@ import math
 import torch
 import torch.nn as nn
 from torch.nn import Module, Parameter, init
+from utilities import sprint as sp
+
+sprint = sp.SPrint()
 
 class WordEmbeddingModule(Module):
 
@@ -51,26 +54,30 @@ class biLSTM(Module):
     def __init__(self, embedding_size, hidden_dim, bidirectional=True):
         super(biLSTM, self).__init__()
 
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = int(hidden_dim/2)
         self.embedding_size = embedding_size
 
         self.lstm = nn.LSTM(self.embedding_size, self.hidden_dim, bidirectional=True, batch_first=True)
 
-        self.hidden = self.init_hidden()
-
-    def init_hidden(self):
+    def init_hidden(self, bs):
         ##
-        return (torch.zeros(1 * 2, self.max_len, self.hidden_dim),
-                torch.zeros(1 * 2, self.max_len, self.hidden_dim))
+        print('size of hidden_dim', self.hidden_dim)
+        return (torch.zeros(1 * 2, bs, self.hidden_dim),
+                torch.zeros(1 * 2, bs, self.hidden_dim))
 
     def forward(self, x):
         ## bs * M/L * d -> (batch, seq_len, input_size)
-        out, self.hidden = self.lstm(x, self.hidden)
-        ## bs * M * c
-        out = out.transpose(1,2)
-        ## bs * c * M
-        return out
+        #sprint.p('heilaaaa', 2)
+        bs, _, _ = x.size()
+        self.hidden = self.init_hidden(bs)
 
+        x, self.hidden = self.lstm(x, self.hidden)
+
+        ## bs * M * c
+        x = x.transpose(1,2)
+        #print('must be bs*c*M',x.size())
+        ## bs * c * M
+        return x
 
 
 class Bilinear2D(nn.Module):
@@ -83,6 +90,7 @@ class Bilinear2D(nn.Module):
 
         self.in1_features = in1_features    # expected (*,b)
         self.in2_features = in2_features    # expected (b,*)
+        #print(self.in1_features, self.in2_features)
         ## out will be a tensor of size (N,a,c)
 
         self.weight = Parameter(torch.Tensor(self.in1_features, self.in2_features))
@@ -113,14 +121,17 @@ class AttentivePoolingNetwork(Module):
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
 
+        self.batch_size = 2
+
         self.embedding_layer = WordEmbeddingModule(vocab_size, embedding_size, word_embedding_model)
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
             self.cnn_bilstm = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
         elif type_of_nn == 'biLSTM':
-            raise ValueError('Not implemented yet')
-            #self.question_cnn_bilstm = biLSTM(self.M, self.embedding_size, self.convolutional_filters, self.device)
+            #sprint.p('eccomiii', 2)
+            #raise ValueError('Not implemented yet')
+            self.cnn_bilstm = biLSTM(self.embedding_size, self.convolutional_filters)
             #self.answer_cnn_bilstm = biLSTM(self.L, self.embedding_size, self.convolutional_filters, self.device)
         else:
             raise ValueError('Mode must be CNN or biLSTM')
@@ -134,18 +145,22 @@ class AttentivePoolingNetwork(Module):
 
         questions = self.embedding_layer(questions)
         ## bs * M * d
+        bs, _, _ = questions.size()
 
         answers = self.embedding_layer(answers)
         ## bs * L * d
+        #print(answers.size())
 
         Q = self.cnn_bilstm(questions)
         ## bs * c * M
+        #print('q size bs*c*M', Q.size())
         A = self.cnn_bilstm(answers)
         ## bs * c * L
+        #print('a size bs*c*L', A.size())
 
         G = self.bilinear(Q.transpose(1,2), A).tanh()
         ## bs * M * L
-
+        #print('G size bs*M*L', G.size())
         roQ = torch.max(G, dim=2)[0].softmax(dim=1)
         ## bs * M
         roA = torch.max(G, dim=1)[0].softmax(dim=1)
@@ -192,6 +207,7 @@ class ClassicQANetwork(nn.Module):
 
         Q = self.cnn(questions)
         ## bs * c * M
+
         A = self.cnn(answers)
         ## bs * c * L
 
