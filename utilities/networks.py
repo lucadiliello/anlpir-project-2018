@@ -6,6 +6,7 @@ from utilities import sprint as sp
 
 sprint = sp.SPrint()
 
+
 class WordEmbeddingModule(Module):
 
     def __init__(self, vocab_size, embedding_size, word_embedding_model=None):
@@ -49,6 +50,7 @@ class CNN(Module):
         return sentence
 
 
+
 class biLSTM(Module):
 
     def __init__(self, embedding_size, hidden_dim, bidirectional=True):
@@ -57,18 +59,17 @@ class biLSTM(Module):
         self.hidden_dim = int(hidden_dim/2)
         self.embedding_size = embedding_size
 
-        self.lstm = nn.LSTM(self.embedding_size, self.hidden_dim, bidirectional=True, batch_first=True)
+        self.lstm = nn.LSTM(self.embedding_size, self.hidden_dim, bias=True, bidirectional=True, batch_first=True)
 
     def init_hidden(self, bs):
-        ##
-        print('size of hidden_dim', self.hidden_dim)
+        # print('size of hidden_dim', self.hidden_dim)
         return (torch.zeros(1 * 2, bs, self.hidden_dim),
                 torch.zeros(1 * 2, bs, self.hidden_dim))
 
     def forward(self, x):
         ## bs * M/L * d -> (batch, seq_len, input_size)
         #sprint.p('heilaaaa', 2)
-        bs, _, _ = x.size()
+        bs = x.size()[0]
         self.hidden = self.init_hidden(bs)
 
         x, self.hidden = self.lstm(x, self.hidden)
@@ -78,6 +79,7 @@ class biLSTM(Module):
         #print('must be bs*c*M',x.size())
         ## bs * c * M
         return x
+
 
 
 class Bilinear2D(nn.Module):
@@ -129,14 +131,12 @@ class AttentivePoolingNetwork(Module):
         if type_of_nn == 'CNN':
             self.cnn_bilstm = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
         elif type_of_nn == 'biLSTM':
-            #sprint.p('eccomiii', 2)
-            #raise ValueError('Not implemented yet')
             self.cnn_bilstm = biLSTM(self.embedding_size, self.convolutional_filters)
-            #self.answer_cnn_bilstm = biLSTM(self.L, self.embedding_size, self.convolutional_filters, self.device)
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
         self.bilinear = Bilinear2D(self.convolutional_filters, self.convolutional_filters)
+
 
 
     def forward(self, questions, answers):

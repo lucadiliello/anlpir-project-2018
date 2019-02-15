@@ -56,7 +56,8 @@ def launch_train_test(
     device = torch.device('cuda') if use_cuda and torch.cuda.is_available() else torch.device('cpu')
     sprint.p('Will train on %s' % (torch.cuda.get_device_name(device) if device.type == 'cuda' else device.type), 2)
 
-
+    if use_cuda and torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     ################################################################################
     ### LOADING DATASET
@@ -138,9 +139,9 @@ def launch_train_test(
 
     sprint.p("Neural network creation",1)
     if network_type == 'AP-CNN':
-        net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn='CNN', convolutional_filters=convolutional_filters, context_len=3).to(device)
+        net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn='CNN', convolutional_filters=convolutional_filters, context_len=k).to(device)
     elif network_type == 'AP-biLSTM':
-        net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn='biLSTM', convolutional_filters=convolutional_filters, context_len=3).to(device)
+        net = networks.AttentivePoolingNetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, type_of_nn='biLSTM', convolutional_filters=convolutional_filters, context_len=k).to(device)
     elif network_type == 'CNN':
         net = networks.ClassicQANetwork(len(vocabulary), word_embedding_size, word_embedding_model=we_model, network_type='CNN', convolutional_filters=convolutional_filters, context_len=k).to(device)
     else:
@@ -174,7 +175,7 @@ def launch_train_test(
     def train_batch(batch):
         sizes, questions, answers, targets = batch
         assert len(questions) == len(answers) == len(targets)
-        
+
         outputs = net(questions, answers)
 
         loss = []
@@ -235,6 +236,8 @@ def launch_train_test(
 
         if validate:
             sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f' % (epoch+1, *test_on_dataset(validation_dataset)), 2)
+            ## to be deleted
+            sprint.p('(Test - MRR: %.2f, MAP: %.2f)' % test_on_dataset(test_dataset), 2)
     sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
 

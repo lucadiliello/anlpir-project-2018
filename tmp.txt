@@ -1,0 +1,75 @@
+[32m
+@@@ - Initializing Hyperparameters[0m
+[33m@@@ - - Will train on GeForce GTX TITAN X[0m
+[32m
+@@@ - Loading datasets[0m
+[33m@@@ - - Datasets loaded[0m
+[32m
+@@@ - Loading the Word Embedding model, you chose Google[0m
+[33m@@@ - - Loading took 87 seconds[0m
+[33m@@@ - - Done[0m
+[32m
+@@@ - Creating batch manager on dataset TrecQA[0m
+[33m@@@ - - Train[0m
+[34m@@@ - - - Removing entries without both positive and negative answers[0m
+[34m@@@ - - - Cleaning[0m
+[34m@@@ - - - Finding max lengths[0m
+[34m@@@ - - - Word2index and padding[0m
+[33m@@@ - - Valid[0m
+[34m@@@ - - - Removing entries without both positive and negative answers[0m
+[34m@@@ - - - Cleaning[0m
+[34m@@@ - - - Finding max lengths[0m
+[34m@@@ - - - Word2index and padding[0m
+[33m@@@ - - Test[0m
+[34m@@@ - - - Removing entries without both positive and negative answers[0m
+[34m@@@ - - - Cleaning[0m
+[34m@@@ - - - Finding max lengths[0m
+[34m@@@ - - - Word2index and padding[0m
+[33m@@@ - - Done[0m
+[32m
+@@@ - Statistics on the 3 datasets[0m
++------------+-------------------+-------------------+------------------+----------------+
+|  Dataset   | AVG # pos answers | AVG # neg answers | AVG question len | AVG answer len |
++------------+-------------------+-------------------+------------------+----------------+
+|   TRAIN    |        5.43       |       40.49       |      25.00       |     161.00     |
+| VALIDATION |        3.52       |       15.94       |      11.00       |     74.00      |
+|    TEST    |        3.65       |       17.56       |      11.00       |     37.00      |
++------------+-------------------+-------------------+------------------+----------------+
+[32m
+@@@ - Neural network creation[0m
+[33m@@@ - - NN Instantiated[0m
+[32m
+@@@ - Training NN[0m
+[33m@@@ - - Batch size: 20[0m
+[33m@@@ - - Starting[0m
+[33m@@@ - - Epoch 1 done, MRR: 0.74, MAP: 0.68[0m
+[33m@@@ - - Epoch 2 done, MRR: 0.73, MAP: 0.68[0m
+[33m@@@ - - Epoch 3 done, MRR: 0.75, MAP: 0.69[0m
+[33m@@@ - - Epoch 4 done, MRR: 0.76, MAP: 0.69[0m
+[33m@@@ - - Epoch 5 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Epoch 6 done, MRR: 0.75, MAP: 0.69[0m
+[33m@@@ - - Epoch 7 done, MRR: 0.74, MAP: 0.69[0m
+[33m@@@ - - Epoch 8 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Epoch 9 done, MRR: 0.76, MAP: 0.71[0m
+[33m@@@ - - Epoch 10 done, MRR: 0.76, MAP: 0.71[0m
+[33m@@@ - - Epoch 11 done, MRR: 0.76, MAP: 0.71[0m
+[33m@@@ - - Epoch 12 done, MRR: 0.76, MAP: 0.71[0m
+[33m@@@ - - Epoch 13 done, MRR: 0.76, MAP: 0.71[0m
+[33m@@@ - - Epoch 14 done, MRR: 0.77, MAP: 0.71[0m
+[33m@@@ - - Epoch 15 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Epoch 16 done, MRR: 0.75, MAP: 0.70[0m
+[33m@@@ - - Epoch 17 done, MRR: 0.75, MAP: 0.70[0m
+[33m@@@ - - Epoch 18 done, MRR: 0.75, MAP: 0.70[0m
+[33m@@@ - - Epoch 19 done, MRR: 0.75, MAP: 0.70[0m
+[33m@@@ - - Epoch 20 done, MRR: 0.75, MAP: 0.70[0m
+[33m@@@ - - Epoch 21 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Epoch 22 done, MRR: 0.75, MAP: 0.70[0m
+[33m@@@ - - Epoch 23 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Epoch 24 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Epoch 25 done, MRR: 0.76, MAP: 0.70[0m
+[33m@@@ - - Training done, it took 1430.32 seconds[0m
+[32m
+@@@ - Testing NN[0m
+[33m@@@ - - Starting[0m
+[33m@@@ - - MAP: 0.69, MRR: 0.75[0m
+[33m@@@ - - Testing done, it took 0.37 seconds[0m
