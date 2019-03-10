@@ -125,7 +125,7 @@ def launch_train_test(
 
     if not silent_mode:
         sprint.p("Statistics on the 3 datasets", 1)
-        t = PrettyTable(['Dataset', 'AVG # pos answers', 'AVG # neg answers', 'AVG question len', 'AVG answer len'])
+        t = PrettyTable(['Dataset', 'Size', 'AVG # pos answers', 'AVG # neg answers', 'AVG question len', 'AVG answer len'])
         t.add_row(['TRAIN'] + ['%2.2f' % x for x in training_dataset.get_statistics()])
         t.add_row(['VALIDATION'] + ['%2.2f' % x for x in validation_dataset.get_statistics()])
         t.add_row(['TEST'] + ['%2.2f' % x for x in test_dataset.get_statistics()])
