@@ -29,11 +29,11 @@ use_cuda = args.use_gpu
 k = 4
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 4000
+convolutional_filters = 400
 batch_size = 20
 negative_answer_count_training = 50
 learning_rate = 1.1
-loss_margin = 0.009
+loss_margin = 0.5
 training_epochs = 25
 
 

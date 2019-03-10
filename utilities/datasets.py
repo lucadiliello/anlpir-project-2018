@@ -107,7 +107,7 @@ class DatasetManager(object):
 
     ## statistics
     def get_statistics(self):
-        return ( numpy.mean(list(map(lambda a: len(a['candidates_pos']), self.data))), ## average_number_pos_answers
-            numpy.mean(list(map(lambda a: len(a['candidates_neg']), self.data))), ## average_number_neg_answers
+        return ( numpy.mean(list(map(lambda a: float(len(a['candidates_pos'])), self.data))), ## average_number_pos_answers
+            numpy.mean(list(map(lambda a: float(len(a['candidates_neg'])), self.data))), ## average_number_neg_answers
             numpy.mean(list(map(lambda a: len(a['question']), self.data))), ## average_question_len
-            numpy.mean(reduce(lambda a,b: a+b, map(lambda e: list(map(lambda x: len(x), e['candidates_pos'] + e['candidates_neg'])), self.data ))) ) ## average_answer_len
+            numpy.mean(reduce(lambda a,b: a+b, map(lambda e: list(map(lambda x: float(len(x)), e['candidates_pos'] + e['candidates_neg'])), self.data ))) ) ## average_answer_len

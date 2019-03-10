@@ -63,8 +63,12 @@ class biLSTM(Module):
 
     def init_hidden(self, bs):
         # print('size of hidden_dim', self.hidden_dim)
+        '''
         return (torch.zeros(1 * 2, bs, self.hidden_dim),
                 torch.zeros(1 * 2, bs, self.hidden_dim))
+        '''
+        return (torch.zeros(1 * 2, bs, self.hidden_dim).cuda(),
+                torch.zeros(1 * 2, bs, self.hidden_dim).cuda())
 
     def forward(self, x):
         ## bs * M/L * d -> (batch, seq_len, input_size)
@@ -84,28 +88,22 @@ class biLSTM(Module):
 
 class Bilinear2D(nn.Module):
 
-    """ Apply Bilinear transformation with 2D input matrices: A * U * B + b"""
+    """ Apply Bilinear transformation with 2D input matrices: A * U * B"""
 
     def __init__(self, in1_features, in2_features):
         super(Bilinear2D, self).__init__()
-        assert(in1_features == in2_features)
 
-        self.in1_features = in1_features    # expected (*,b)
-        self.in2_features = in2_features    # expected (b,*)
-        #print(self.in1_features, self.in2_features)
-        ## out will be a tensor of size (N,a,c)
-
-        self.weight = Parameter(torch.Tensor(self.in1_features, self.in2_features))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        self.in1_features = in1_features    # size (*, n, m)
+        self.in2_features = in2_features    # size (*, c, d)
+        ## self.weight matrix will have size (m * c)
+        self.weight = Parameter(torch.Tensor(self.in1_features, self.in2_features), requires_grad=True)
+        torch.nn.init.normal_(self.weight, mean=0, std=1)
 
     def forward(self, input1, input2):
         if input1.dim() == 2 and input2.dim() == 2:
             # fused op is marginally faster
             return input1.mm(self.weight).mm(input2)
-
+        print(self.weight.sum())
         return input1.matmul(self.weight).matmul(input2)
 
     def extra_repr(self):
@@ -129,13 +127,15 @@ class AttentivePoolingNetwork(Module):
 
         ## CNN or biLSTM
         if type_of_nn == 'CNN':
-            self.cnn_bilstm = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
+            self.cnn_or_bilstm = CNN(self.embedding_size, self.convolutional_filters, self.context_len)
         elif type_of_nn == 'biLSTM':
-            self.cnn_bilstm = biLSTM(self.embedding_size, self.convolutional_filters)
+            self.cnn_or_bilstm = biLSTM(self.embedding_size, self.convolutional_filters)
         else:
             raise ValueError('Mode must be CNN or biLSTM')
 
-        self.bilinear = Bilinear2D(self.convolutional_filters, self.convolutional_filters)
+        #self.bilinear = Bilinear2D(self.convolutional_filters, self.convolutional_filters)
+        self.weight = Parameter(torch.Tensor(self.convolutional_filters, self.convolutional_filters), requires_grad=True)
+        torch.nn.init.normal_(self.weight, mean=0, std=1)
 
 
 
@@ -145,22 +145,21 @@ class AttentivePoolingNetwork(Module):
 
         questions = self.embedding_layer(questions)
         ## bs * M * d
-        bs, _, _ = questions.size()
 
         answers = self.embedding_layer(answers)
         ## bs * L * d
-        #print(answers.size())
 
-        Q = self.cnn_bilstm(questions)
+        Q = self.cnn_or_bilstm(questions)
         ## bs * c * M
         #print('q size bs*c*M', Q.size())
-        A = self.cnn_bilstm(answers)
+        A = self.cnn_or_bilstm(answers)
         ## bs * c * L
         #print('a size bs*c*L', A.size())
 
-        G = self.bilinear(Q.transpose(1,2), A).tanh()
+        G = (Q.transpose(1,2).matmul(self.weight).matmul(A)).tanh()
+        #G = self.bilinear(Q.transpose(1,2), A).tanh()
         ## bs * M * L
-        #print('G size bs*M*L', G.size())
+        #print('G size bs * M * L', G.size())
         roQ = torch.max(G, dim=2)[0].softmax(dim=1)
         ## bs * M
         roA = torch.max(G, dim=1)[0].softmax(dim=1)

@@ -66,19 +66,19 @@ class Loader:
         elif self.pkg_name == 'TrecQA':
 
             import jsonlines
-            with jsonlines.open('data/Trec-QA/valid.jsonl') as reader:
+            with jsonlines.open('data/Old-Trec-QA/valid.jsonl') as reader:
                 for obj in reader:
                     obj['question'] = str(obj['question'])
                     obj['candidates'] = [{'sentence': str(cand['sentence']), 'label': cand['label']} for cand in obj['candidates']]
                     valid.append(obj)
 
-            with jsonlines.open('data/Trec-QA/train.jsonl') as reader:
+            with jsonlines.open('data/Old-Trec-QA/train.jsonl') as reader:
                 for obj in reader:
                     obj['question'] = str(obj['question'])
                     obj['candidates'] = [{'sentence': str(cand['sentence']), 'label': cand['label']} for cand in obj['candidates']]
                     train.append(obj)
 
-            with jsonlines.open('data/Trec-QA/test.jsonl') as reader:
+            with jsonlines.open('data/Old-Trec-QA/test.jsonl') as reader:
                 for obj in reader:
                     obj['question'] = str(obj['question'])
                     obj['candidates'] = [{'sentence': str(cand['sentence']), 'label': cand['label']} for cand in obj['candidates']]
