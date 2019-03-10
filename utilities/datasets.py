@@ -37,6 +37,8 @@ class DatasetManager(object):
         sprint.p('Finding max lengths', 3)
         self.set_max_len()
 
+        self.statistics = self.set_statistics()
+
         ### WORD-2-INDEX AND PADDING
         sprint.p('Word2index and padding', 3)
         self.WI_and_padding()
@@ -105,10 +107,13 @@ class DatasetManager(object):
             self.data[i]['candidates_pos'] = [([self.word2index[x] for x in sentence] + [0] * (self.max_answer_len - len(sentence))) for sentence in self.data[i]['candidates_pos']]
             self.data[i]['candidates_neg'] = [([self.word2index[x] for x in sentence] + [0] * (self.max_answer_len - len(sentence))) for sentence in self.data[i]['candidates_neg']]
 
-    ## statistics
     def get_statistics(self):
-        return ( len(self),
-            numpy.mean(list(map(lambda a: float(len(a['candidates_pos'])), self.data))), ## average_number_pos_answers
-            numpy.mean(list(map(lambda a: float(len(a['candidates_neg'])), self.data))), ## average_number_neg_answers
+        return self.statistics
+
+    ## statistics
+    def set_statistics(self):
+        return (len(self),
+            numpy.mean(list(map(lambda a: len(a['candidates_pos']), self.data))), ## average_number_pos_answers
+            numpy.mean(list(map(lambda a: len(a['candidates_neg']), self.data))), ## average_number_neg_answers
             numpy.mean(list(map(lambda a: len(a['question']), self.data))), ## average_question_len
             numpy.mean(reduce(lambda a,b: a+b, map(lambda e: list(map(lambda x: float(len(x)), e['candidates_pos'] + e['candidates_neg'])), self.data ))) ) ## average_answer_len
