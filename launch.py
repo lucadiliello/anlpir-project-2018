@@ -71,7 +71,7 @@ def launch_train_test(
 
 
     ################################################################################
-    ### LOADING WORD EMBEDDINGS MODEL
+    ### LOADING WORDS EMBEDDING MODEL
     ################################################################################
 
     sprint.p('Loading the Word Embedding model, you chose %s' % model_type, 1)
@@ -82,6 +82,12 @@ def launch_train_test(
         word_embedding_size = we_model.wv.syn0.shape[1]
     elif model_type == 'GoogleRed':
         we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+        word_embedding_size = we_model.wv.syn0.shape[1]
+    elif model_type == 'Glove':
+        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/glove.w2vformat.txt')
+        word_embedding_size = we_model.wv.syn0.shape[1]
+    elif model_type == 'Wiki':
+        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/wiki-news-300d-1M.vec')
         word_embedding_size = we_model.wv.syn0.shape[1]
     elif model_type == 'LearnGensim':
         we_model = custom.word_embedding_model(_loader.get_documents(), word_embedding_size, word_embedding_window, 8)

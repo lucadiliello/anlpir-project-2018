@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(description='Create an AP network for Question 
 
 parser.add_argument("-n", help="type of the network, either CNN or biLSTM", type=str, default='AP-CNN', dest='network_type', choices=['AP-CNN','AP-biLSTM','CNN','biLSTM'])
 parser.add_argument("-d", help="dataset to use, either TrecQA or WikiQA", type=str, default='TrecQA', dest='dataset_name', choices=['TrecQA','WikiQA'])
-parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='LearnPyTorch', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch'])
+parser.add_argument("-m", help="specify which embedding model should be used", type=str, default='LearnPyTorch', dest='model_type', choices=['Google', 'GoogleRed', 'LearnGensim', 'LearnPyTorch', 'Glove', 'Wiki'])
 parser.add_argument("-p", help="use powerful cuda nvidia gpu", dest='use_gpu', action='store_true')
 args = parser.parse_args()
 
@@ -23,13 +23,13 @@ use_cuda = args.use_gpu
 
 
 ################################################################################
-### HYPERPARAMETERS
+### HYPERPARAMETERS - CHANGE THIS PART
 ################################################################################
 
-k = 4
+k = 3
 word_embedding_size = 300
 word_embedding_window = 5
-convolutional_filters = 400
+convolutional_filters = 3600
 batch_size = 20
 negative_answer_count_training = 50
 learning_rate = 1.1
