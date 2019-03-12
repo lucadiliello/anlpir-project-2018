@@ -242,8 +242,7 @@ def launch_train_test(
 
         if validate:
             sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f' % (epoch+1, *test_on_dataset(validation_dataset)), 2)
-            ## to be deleted
-            sprint.p('(Test - MRR: %.2f, MAP: %.2f)' % test_on_dataset(test_dataset), 2)
+
     sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 
 
