@@ -2,12 +2,12 @@
 
 Please launch with:
 ```bash
-./main.py [-p] [-m <GoogleRed|Google|LearnPyTorch|LearnGensim>] [-d <TrecQA|WikiQA>] [-n <CNN|biLSTM>]
+./main.py [-p] [-m <GoogleRed|Google|Glove|Wiki|LearnPyTorch|LearnGensim>] [-d <TrecQA|WikiQA>] [-n <CNN|biLSTM|AP-CNN|AP-biLSTM>]
 ```
 * Note that using `-p` option requires a dedicated CUDA GPU with at least 4GB of VRAM.
   
-Or launch:
+Or customize and launch:
 ```bash
 ./optimizer.py
 ```
-to search for the best parameters configuration.
+to greedy search for the best parameters configuration.
