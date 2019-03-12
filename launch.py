@@ -78,16 +78,16 @@ def launch_train_test(
 
     starting_time = time()
     if model_type == 'Google':
-        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300.bin', binary=True)
+        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/google.bin', binary=True)
         word_embedding_size = we_model.wv.syn0.shape[1]
     elif model_type == 'GoogleRed':
-        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/GoogleNews-vectors-negative300-SLIM.bin', binary=True)
+        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/google-slim.bin', binary=True)
         word_embedding_size = we_model.wv.syn0.shape[1]
     elif model_type == 'Glove':
-        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/glove.w2vformat.txt')
+        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/glove.bin', binary=True)
         word_embedding_size = we_model.wv.syn0.shape[1]
     elif model_type == 'Wiki':
-        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/wiki-news-300d-1M.vec')
+        we_model = gensim.models.KeyedVectors.load_word2vec_format('models/wiki.bin', binary=True)
         word_embedding_size = we_model.wv.syn0.shape[1]
     elif model_type == 'LearnGensim':
         we_model = custom.word_embedding_model(_loader.get_documents(), word_embedding_size, word_embedding_window, 8)
@@ -241,7 +241,7 @@ def launch_train_test(
             #sprint.p("Batch trained, AVG loss: %2.8f" % (loss.item()/batch_size), 3)
 
         if validate:
-            sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f' % (epoch+1, *test_on_dataset(validation_dataset)), 2)
+            sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f, loss: %.3f' % (epoch+1, *test_on_dataset(validation_dataset), loss.item()), 2)
 
     sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 

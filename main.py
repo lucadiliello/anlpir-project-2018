@@ -26,6 +26,39 @@ use_cuda = args.use_gpu
 ### HYPERPARAMETERS - CHANGE THIS PART
 ################################################################################
 
+#'''
+# Best for CNN
+
+k = 3
+word_embedding_size = 300
+word_embedding_window = 5
+convolutional_filters = 3600
+batch_size = 20
+negative_answer_count_training = 50
+learning_rate = 1.1
+loss_margin = 0.5
+training_epochs = 25
+#'''
+
+
+'''
+# Best for biLSTM
+
+k = 1
+word_embedding_size = 300
+word_embedding_window = 3
+convolutional_filters = 282
+batch_size = 20
+negative_answer_count_training = 40
+learning_rate = 1.1
+loss_margin = 0.1
+training_epochs = 25
+#'''
+
+
+'''
+# Best for AP-CNN
+
 k = 4
 word_embedding_size = 300
 word_embedding_window = 5
@@ -35,7 +68,22 @@ negative_answer_count_training = 50
 learning_rate = 1.1
 loss_margin = 0.5
 training_epochs = 25
+'''
 
+
+'''
+# Best for AP-biLSTM
+
+k = 1
+word_embedding_size = 300
+word_embedding_window = 3
+convolutional_filters = 400
+batch_size = 15
+negative_answer_count_training = 50
+learning_rate = 1.1
+loss_margin = 0.2
+training_epochs = 25
+'''
 
 
 ################################################################################
