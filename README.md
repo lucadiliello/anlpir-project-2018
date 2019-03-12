@@ -6,8 +6,8 @@ Please launch with:
 ```
 * Note that using `-p` option requires a dedicated CUDA GPU with at least 4GB of VRAM.
   
-Or launch:
+Or customize and launch:
 ```bash
 ./optimizer.py
 ```
-to search for the best parameters configuration.
+to greedy search for the best parameters configuration.
