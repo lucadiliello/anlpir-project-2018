@@ -12,4 +12,4 @@ Or customize and launch:
 ```
 to greedy search for the best parameters configuration.
 
-* Word Embedding models have to be added manually to the models folder since they are really large files.
+* Word Embedding models have to be added manually to the `./models` folder since they are really large files.
