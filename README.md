@@ -11,3 +11,5 @@ Or customize and launch:
 ./optimizer.py
 ```
 to greedy search for the best parameters configuration.
+
+* Word Embedding models have to be added manually to the models folder since they are really large files.
