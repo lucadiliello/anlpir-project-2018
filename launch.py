@@ -238,10 +238,9 @@ def launch_train_test(
             loss = train_batch(batch)
             loss.backward(retain_graph=True)
             optimizer.step()    # Does the update
-            #sprint.p("Batch trained, AVG loss: %2.8f" % (loss.item()/batch_size), 3)
 
         if validate:
-            sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f, loss: %.3f' % (epoch+1, *test_on_dataset(validation_dataset), loss.item()), 2)
+            sprint.p('Epoch %d done, MRR: %.2f, MAP: %.2f, loss: %.4f' % (epoch+1, *test_on_dataset(validation_dataset), loss.item()), 2)
 
     sprint.p('Training done, it took %.2f seconds' % (time()-starting_time), 2)
 

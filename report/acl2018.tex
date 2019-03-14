@@ -16,6 +16,10 @@
 \usepackage{times}
 \usepackage{latexsym}
 \usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage{graphicx}
+\graphicspath{ {pictures/} }
 
 \usepackage{url}
 
@@ -30,9 +34,9 @@
 
 \newcommand\BibTeX{B{\sc ib}\TeX}
 
-\title{ANLP and IR project - Attentive pooling in CNN and BiLSTM}
+\title{ANLP and IR project - Attentive pooling in \textit{CNN} and \textit{biLSTM} - A word-embedding comparison}
 
-\author{Paganin Martina and Luca di Liello \\
+\author{Martina Paganin and Luca Di Liello \\
   Universit\`a degli studi di Trento \\
   {\tt martina.paganin@studenti.unitn.it
        luca.diliello@studenti.unitn.it} \\
@@ -43,158 +47,266 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-  lo scriviamo alla fine
+In the field of Natural Language Processing and Information Retrieval, the task of question answering/answer selection is one of the most important.
+In this context, Attentive Pooling networks have been proposed. Based on a previous work, two alternative networks have been implemented: \textit{CNN} and \textit{biLSTM}. Both the networks have a final common step consisting in the Attentive Pooling phase.
+This work has been re-proposed with different embedding models, in order to study its behavior under different implementations.
+Finally, several tests have been performed on two different datasets, to find a good combination of network parameters and to find the best embedding model.
+
 \end{abstract}
 
 \section{Introduction}
-(Spieghiamo un po cosa riporta l'articolo, qual'è lo scopo, cosa ne salta fuori e che è stato replicato usando pytorch.)
 
-This paper reports the development of Attentive Pooling, a method proposed in FONTE. This methodology aims at building a model, more specifically, a neural network, which has to learn how to discriminate pair-wise ranking.
+This paper reports the development of a method proposed in Attentive Pooling Networks, by Dos Santos et al\cite{mainpaper}. This methodology aims at building a model, more specifically, a neural network, which has to learn how to recognise correctness of answers given a question.
 
-Attentive pooling has to learn a similarity measure over pairs of question-answer in order to perform the ranking. 
+Attentive Pooling has to learn a similarity measure over pairs of question-answer in order to perform the ranking. 
 
-According to the aforementioned paper, the attentive pooling step improves traditional neural network (CNN and BiLSTM) performances. 
-Our implementation reproduces the method proposed in the paper, with some slight differences (mostly to speed up execution time) that will be discussed in the following sections.
+According to the aforementioned paper, the attentive pooling step improves traditional neural network (\textit{CNN} and \textit{biLSTM}) performances. 
+Our implementation reproduces the method proposed in the paper, with some slight differences to explore how different embedding models can affect the already existing implementation. These will be discussed in the following sections.
 
 \section{Methodology}
-The method proposed reflects the structure suggested by the referenced paper, so both a CNN and a BiLSTM were implemented following the scheme and the instructions explained in the paper.
+The method proposed reflects the structure suggested by the referenced paper, so both a \textit{CNN} and a \textit{biLSTM} were implemented following the scheme and the instructions explained in the paper.
 
-The networks are trained by feeding them with batches composed of tuples. A batch is composed as follow: [(question, correct\_answer), (question, incorrect\_random\_answer1), ..., (question, incorrect\_random\_answer50)].
-
-Detailed explanations of the two networks and the attentive pooling method follow in the next sections.
+Detailed explanations of the two networks and the attentive pooling method follow in the next subsections.
 
 Both networks work on inputs in an embedded form. This means that, first of all, fixed-length independent continuous vector representations are computed. Then, the networks proceed through different steps.
 
 Finally, both methods operate max-pooling and then compute cosine similarity between question and answers representations. 
-\subsection{The CNN}
-The paper suggests to create a particular input representation (the Z vector) before the convolutional phase. Both question and answer are processed by the same network in order to derive the same weights matrix. The number of convolutional filters were initially chosen as those reported in the paper but then, due to problem in the convergence of the network, they were further increased.
 
-inventarsi ancora qualcosa
+\subsection{The \textit{CNN}}
 
-\subsection{The BiLSTM}
-The bidirectional LSTM network takes as input embedded questions and answers, as the previous described convolutional neural network. This kind of network has the ability of processing the sequence in two directions, utilizing the information of future tokens. In our implementation the hidden vector size was chosen as the one suggested in the paper. 
+The paper suggests to create a particular input representation (called $Z$ vector) before the convolution phase. This vector holds information for each word, such as previous and following words in the sequence. Given a neighbourhood of size $k$, a question/answer length $m$ and an embedding size $d$, the $Z$ vector has a size of $kd$ x $m$ and each column $i$ contains $k$ embedded words centralized on the $i$-th word of the original sentence. Follows an example with $k$ equal to $3$.
+\[
+\begin{bmatrix}
+    w_0 & w_1 & \dots & w_m \\
+\end{bmatrix}
+ \rightarrow
+\begin{bmatrix}
+    0 & w_0 & \dots & w_{m-1} \\
+    w_0 & w_1 & \dots & w_m \\
+    w_1 & w_2 & \dots & 0 \\
+\end{bmatrix}
+\]
 
-provarne altre magari?
+\begin{table*}[h]
+  \centering
+  \begin{tabular}{|l|c|c|c|c|c|}
+    \hline
+    \bf Part & \bf \# entries & \bf \# pos answers & \bf \# neg answers & \bf question len & \bf answers len \\
+    \hline
+    Train & 1161 & 5.43 & 40.49 & 7.38 & 24.80 \\
+    Validation & 69 & 3.52 & 15.94 & 6.70 & 24.30 \\
+    Test & 68 & 3.65 & 17.56 & 7.43 & 21.84 \\
+    \hline
+  \end{tabular}
+  \caption{Average statistics on $TrecQA$ dataset}
+  \label{table:statstrec}
+\end{table*}
 
-Running this kind of network take considerably more time than the CNN, maybe due to the fact that the latter has a less complex structure and then a faster training phase. BiLSTM has instead to learn and remember more information and its execution is consequently more computational expensive.
+\begin{table*}[h]
+  \centering
+  \begin{tabular}{|l|c|c|c|c|c|}
+    \hline
+    \bf Part & \bf \# entries & \bf \# pos answers & \bf \# neg answers & \bf question len & \bf answers len \\
+    \hline
+    Train & 856 & 1.19 & 8.91 & 6.04 & 21.10 \\
+    Validation & 122 & 1.11 & 8.11 & 6.17 & 20.32 \\
+    Test & 235 & 1.20 & 8.63 & 6.06 & 20.69 \\
+    \hline
+  \end{tabular}
+  \caption{Average statistics on $WikiQA$ dataset}
+  \label{table:statswiki}
+\end{table*}
+
+Both question and answer are processed by the same network in order to derive the same weights matrix. The number of convolutional filters is chosen equal to $4000$ as reported in the aforementioned paper but in the version without AP it can also be slightly decreased (to $3600$).
+
+\subsection{The \textit{biLSTM}}
+The bidirectional $LSTM$ network takes as input embedded questions and answers, as the previous described convolutional neural network. This kind of network has the ability of processing the sequence in two directions, using both the information about past and future tokens.
+This implements a sort of memory mechanism, allowing the network to "remember" the previous inputs and be more suitable to processing sentences.
+In our implementation the hidden vector size was chosen as the one suggested in the paper (282).
+
+Running this kind of network takes considerably more time compared to the \textit{CNN} if considering a number of convolutional filters similar to the number of hidden units, due to the fact that the latter has a less complex structure and then a faster training phase. \textit{biLSTM}s have instead to learn and remember more information and their execution is consequently more computational expensive. Moreover each batch requires the generation of new hidden vectors with an appropriate size.
 
 \subsection{Attentive Pooling}
-Attentive Pooling is the method proposed by the authors of the referenced paper to improve the discriminative models' performance on pair-wise ranking. This layer aims at learning the representations of both inputs and their similarity measurement. The main idea is learning the similarity between the two inputs and then perform a pooling phase on the previously obtained vectors. 
-Attentive pooling can be applied to CNNs and also to RNNs, and in this experiment it can be found as final step in the model.
+
+Attentive Pooling is the method proposed by the authors of the referenced paper to improve the discriminative models performance on pair-wise ranking. It consists in building a kind of common map for words, with score values that are independent from the position that a term can occupy inside a question/answer. This layer aims at learning the representations of both inputs and their similarity measurement. The main idea is learning the similarity between the two inputs and then performing a pooling phase on the previously obtained vectors. 
+Attentive pooling can be applied to \textit{CNN}s and also to \textit{RNN}s, and in this experiment it can be found as final step in the model.
+
+\begin{table*}[t]
+  \centering
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    \bf Network structure & \bf context\_window & \bf filters\_number & \bf batch\_size & \bf learning\_rate & \bf loss\_margin \\
+    \hline
+    \textit{CNN} & 3 & 3600 & 20 & 1.1 & 0.5 \\
+    \textit{biLSTM} & 1 & 282 & 20 & 1.1 & 0.1 \\
+    \textit{AP-CNN} & 4 & 400 & 20 & 1.1 & 0.5 \\
+    \textit{AP-BiLSTM} & 1 & 282 & 15 & 1.1 & 0.2 \\
+    \hline
+  \end{tabular}
+  \caption{Best parameters for each networks structure}
+  \label{table:params}
+\end{table*}
+
+\begin{table}[h]
+    \begin{center}
+        \begin{tabular}{|c|c|}
+        \hline
+        question & pos\_answer \\
+        \hline
+        question & neg\_answer \\
+        \hline
+        question & neg\_answer \\
+        \hline
+        \vdots & \vdots \\
+        \hline
+        question & neg\_answer \\
+        \hline
+        \end{tabular}
+    \caption{A batch entry}
+    \label{table:entry}
+    \end{center}
+\end{table}
 
 \subsection{Word Embedding model}
-As said before, the input for the two networks is in an embedding form, so an embedding layer is necessary in the first phase. Embedding models are useful for computing vector representation of words, and in this implementation different models were tried:
+As said in the previous sections, the input for the two networks is in an embedded form, so an embedding layer is necessary in the first phase. Embedding models are useful for computing vector representation of words, and to accomplish this task, PyTorch library provides a dedicated neural network module for word embedding. Moreover, word embedding models avoid the giant dimensional space needed by other methods, such as the one-hot encoding.
+The PyTorch module allows to encode words as vectors of real numbers, which is an essential processing phase in $NLP$ tasks.
+The PyTorch embedding layers allows both the online learning of the word embedding while training the network and the load of a pre-trained models such as the ones developed by Facebook, Google and the Stanford University \cite{w2v} \cite{glove} \cite{wiki}. This models are trained on very large datasets of text such as Wikipedia's dumps or news collections.
 
-\begin{itemize}
-    \item LearnPytorch
-    \item Word2Vec (gensim)
-    \item Google
-    \item Google Reduced
-\end{itemize}
+In our implementation, we tested 4 different pre-trained models and two different ways of learning the word embedding in an online manner. All the details, description and comparisons follow in section 6.
 
-The torch.nn.Embedding module allows to encode word as vectors of real numbers, which is an essential processing phase in NLP tasks. 
-The Word2Vec is a pre-trained embedding model which learns vector representations of word from the vocabulary learned on the training set.
+\section{Datasets description and preparation}
 
-Scrivere qualcosa sugli altri
+Two different datasets were used to train and test the architectures: the $TrecQA$ (Text REtrival Conference) Question Answer dataset (8-13) \cite{trec} and the $WikiQA$ dataset developed by Microsoft \cite{wikids}.
 
-\subsection{Differences from the suggested implementation}
-paragrafetto su cose diverse da articolo e why
+These datasets are organized as a list of candidate answers for each one of the questions. The answers are tagged as positive or negative according to their correctness with respect to the related question. Tables \ref{table:statstrec} and \ref{table:statswiki} show some statistics about the two datasets.
 
-\section{Datasets description}
-Two dataset were used to train and test the architectures, TREC-QA and WikiQA. These test sets are organized as a list of candidate answers for each one of the questions in the test set.
+The networks are trained by feeding them with batches composed of tuples. A batch is composed of different entries, where each one is a list of up to $50$ tuples. Table \ref{table:entry} shows an example of entry. Given that each entry needs at least a question with a negative and a positive answer, the datasets has been filtered to remove questions with only negative or with only positive answers.
 
-TREC-QA has been processed removing only positive or negative answers. The longest question is composed by 27 words, while the longest answer has 204 words. 
+\section{Tests for parameters setting}
 
-Wiki-QA eccc
+Several tests were done, on both the two datasets, in order to try different parameter combinations and find the best one for each network structure. Parameters that need to be found are $k$ (the context window), the batch size $bs$, the learning rate $lr$ and the margin loss $ml$. The number of epochs was fixed at $25$. As in the original paper, the best parameter configuration was decided to be the same for both datasets, in order to have a more dataset-independent network, able to better generalize with respect to different contexts.
 
-qualche tabella con qualche numero?
+MRR and MAP were then computed by trying different combination of the parameters listed above. 
 
-\section{Issues faced during development}
-Descrivere brevemente problematiche incontrate e come sono state affrontate 
+For the $TrecQA$ dataset, combinations that tend to maximize both these two indexes are those with batch size equal to $20$ and an initial learning rate equal to $1.1$. The learning rate is then linearly decreased at each epoch. To assure better results on \textit{CNN} architectures it is better to set $k$ to $3$/$4$ as the context window for the convolution phase. 
 
+Moreover, the loss margin used in the hinge loss function should be set to $0.5$ and $0.1$ for the \textit{CNN} and \textit{biLSTM} architectures respectively.
 
+Each entry of a batch is a sequence of up to $50$ tuples allowing the use of a hard negative training technique. However, lot of questions do not have so many negative answers and than there are lot of entries shorter than $50$ tuples.
 
-\begin{table}[t!]
-\begin{center}
-\begin{tabular}{|l|l|l|}
-\hline \bf Entity & \bf Frequency & \bf Total \# of instances \\ \hline
-Cuisine & 70 & 573\\
-Info & 2 & 16\\
-Location & 9 & 338\\
-People & 4 & 12\\
-Price info & 6 & 354\\
-Total &  & 1293\\
-\hline
-\end{tabular}
-\end{center}
-\caption{\label{font-table} Intent distribution }
-\end{table}
-
-
-
-\section{Evaluation}
-
-\subsection{CNN}
-
-\begin{table}[t!]
-\begin{center}
-\begin{tabular}{|l|l|l|}
-\hline \bf & \bf NER CRF & \bf NER SPACY \\ \hline
-Accuracy & 0.99 & 0.985 \\
-F1 score & 0.99 & 0.984 \\
-Precision & 0.99 & 0.985 \\
-\hline
-\end{tabular}
-\end{center}
-\caption{\label{font-table} Evaluation NLU model }
-\end{table}
-
-\subsection{BiLSTM}
-
-\subsection{Version with Attentive Pooling}
-cosa aggiunge e perchè sarebbe utile
-
+These parameters were mantained also during the testing phase on the $WikiQA$ dataset. Table \ref{table:params} summarizes the best combination of parameters found for each network architecture.
 
 \section{Results and discussion}
-cosa ci viene, tabelle varie, qualche commento su utilità attentive pooling
 
-\begin{table}[t!]
+\begin{table}[h]
 \begin{center}
-\begin{tabular}{|l|l|}
-\hline \bf Intent & \bf Frequency \\ \hline
-Affirm & 260 \\
-Deny & 85 \\
-Greet & 13 \\
-Inform & 1014 \\
-Request info & 16 \\
-Thank you & 589 \\
-Total & 1977 \\
+\begin{tabular}{|l|l|l|}
+\hline \bf Network structure & \bf MAP & \bf MRR \\ 
+\hline
+\textit{CNN} & 0.70 & 0.79  \\
+\textit{biLSTM} & 0.72 & 0.79  \\
+\textit{AP-CNN} & 0.66 & 0.77  \\
+\textit{AP-BiLSTM} & 0.66 & 0.76 \\
 \hline
 \end{tabular}
 \end{center}
-\caption{\label{font-table} Intent distribution }
+\caption{Results on $TrecQA$}
+\label{table:trecres}
 \end{table}
 
-\begin{table}[t!]
+\begin{table}[h]
 \begin{center}
-\begin{tabular}{|l|l|}
-\hline \bf Policy & \bf Average F1 \\ \hline
-Augm.-Sklearn & 0.924 \\
-Augm.(10 max history)-Rest. & 0.501 \\
-Restaurant & 0.537 \\
-Sklearn & 0.840 \\
+\begin{tabular}{|l|l|l|}
+\hline \bf Network structure & \bf MAP & \bf MRR \\ \hline
+\textit{CNN} & 0.66 & 0.66  \\
+\textit{BiLSTM} & 0.65 & 0.65  \\
+\textit{AP-CNN} & 0.64 & 0.68  \\
+\textit{AP-BiLSTM} & 0.63 & 0.67 \\
 \hline
 \end{tabular}
 \end{center}
-\caption{\label{font-table} Evaluation dialog model }
+\caption{Results on $WikiQA$}
+\label{table:wikires}
 \end{table}
+
+Table \ref{table:trecres} and \ref{table:wikires} report results obtained with the best combination of parameters that was found. As can be seen, results on $WikiQA$ are generally lower for all the $4$ architectures. This may be due to the fact that $WikiQA$ dataset has fewer entries ($856$ vs $1161$) and a bigger test set. Moreover, for each question it has a lower number of positive answers and this may affect the composition of the batch entries.
+
+Analyzing results obtained on $TrecQA$, it can be noticed that the best performing network is \textit{biLSTM}, followed by \textit{CNN}, while versions with AP delivered lower results maybe due to slower convergence related to hardware limitations.
+
+\section{Performances of embedding models}
+
+Now it follows a comparison of different word embedding models, to show how they can affect performances. All the tests have been done on the same machine to make fair time comparisons. 6 different ways of embedding words were taken into account:
+\begin{itemize}
+    \item $Google$: The GoogleNews word2vec model \cite{w2v}, containing about 3 million words. It is trained on a very large dataset of news, as the name suggests.
+    \item{$GoogleRed$: A reduced version of the GoogleNews word2vec model \cite{git}, containing about $300.000$ words, filtered with the help of English dictionaries. }
+    \item{$Glove$: The Glove word2vec model developed by the Stanford University \cite{glove}.}
+    \item{$Wiki$: word2vec model developed by Facebook-research team \cite{wiki}, trained on Wikipedia and containing abount a 1 million words.}
+    \item{$LearnPyTorch$: let the PyTorch embedding layer \cite{embedding} learn the best word embedding while training the Question-Answer network.}
+    \item{$LearnGensim$: create a word2vec model using Gensim \cite{gensim} on the datasets before training the Question-Answer network.}
+\end{itemize}
+All embedding models will create, for each word, fixed size vectors $v \in \mathbb{R}^{300}$
+
+Before explaining the results in performances, a note about the time impact of different models on the training phase (all models are in binary format):
+\begin{itemize}
+    \item $Google$: $89.6s$ to be loaded.
+    \item $GoogleRed$: $9.3s$ to be loaded.
+    \item $Glove$: $10.6s$ to be loaded.
+    \item $Wiki$: $26.7s$ to be loaded.
+    \item $LearnPyTorch$: it does not need to be loaded but gives a $\sim20\%$ increase in training time. \item $LearnGensim$: needs about $93s$ to be trained on TrecQA and $44s$ on WikiQA.
+\end{itemize}
+
+The first comparison regards the impact these models have on the training time. Picture \ref{picture:time} shows the average time needed by the training phase to complete with a given embedding model. This time does not take into account the loading time of the model in memory.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{time.eps}
+    \caption{Time comparisons between models}
+    \label{picture:time}
+\end{figure}
+
+Let's have a look at the main results of this paper: pictures \ref{picture:google}, \ref{picture:googlered}, \ref{picture:glove}, \ref{picture:wiki}, \ref{picture:learnpytorch} and \ref{picture:learngensim} show how the embedding model affect performances of the networks. MAP results are in blue, while MRR are in orange. After lot of tests, the results show clearly that the best embedding model is $GoogleRed$, that is, a version of $Google$ filtered to remove all words that are not contained in English dictionaries \cite{git}. Given the smaller dimension and the removal of junk-words, it shows faster execution times and better performances than any other embedding model. Moreover, given that this models have to be finally loaded in the GPU memory, it allows the usage of bigger batches, in particular when the GPU memory is not really large.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{google.eps}
+    \caption{Performances of $GoogleRed$ embedding model}
+    \label{picture:google}
+\end{figure}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{googlered.eps}
+    \caption{Performances of $Google$ embedding model}
+    \label{picture:googlered}
+\end{figure}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{glove.eps}
+    \caption{Performances of $Glove$ embedding model}
+    \label{picture:glove}
+\end{figure}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{wiki.eps}
+    \caption{Performances of $Wiki$ embedding model}
+    \label{picture:wiki}
+\end{figure}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{learnpytorch.eps}
+    \caption{Performances of $LearnPyTorch$ embedding model}
+    \label{picture:learnpytorch}
+\end{figure}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{learngensim.eps}
+    \caption{Performances of $LearnGensim$ embedding model}
+    \label{picture:learngensim}
+\end{figure}
+
+\clearpage
 
 \bibliography{acl2018}
 \bibliographystyle{plain}
 
 \end{document}
-
-
-
-
 
